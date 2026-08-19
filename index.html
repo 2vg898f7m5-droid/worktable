@@ -506,7 +506,7 @@ function setSettings(s){localStorage.setItem(NS+'settings',JSON.stringify(s))}
 /* ====== sync ====== */
 const Sync={
   sb:null,lastErr:'',
-  init(){const s=settings();if(!s.syncEnabled||!s.supabaseUrl||!s.supabaseKey){this.sb=null;this.set('off');return Promise.resolve(null)}if(this.sb)return Promise.resolve(this.sb);this.set('sync');return this.loadLib().then(()=>{try{this.sb=window.supabase.createClient(s.supabaseUrl,s.supabaseKey,{auth:{persistSession:false}})}catch(e){this.lastErr='init:'+e.message;this.set('err');return null}this.set('ready');return this.sb}).catch(e=>{this.lastErr='loadLib:'+e;this.set('err');return null})},
+  init(){const s=settings();if(!s.syncEnabled||!s.supabaseUrl||!s.supabaseKey){this.sb=null;this.set('off');return Promise.resolve(null)}if(this.sb)return Promise.resolve(this.sb);this.set('sync');return Promise.race([this.loadLib().then(()=>{try{this.sb=window.supabase.createClient(s.supabaseUrl,s.supabaseKey,{auth:{persistSession:false}})}catch(e){this.lastErr='init:'+e.message;this.set('err');return null}this.set('ready');return this.sb}).catch(e=>{this.lastErr='loadLib:'+e;this.set('err');return null}),new Promise(r=>setTimeout(()=>r(null),8000))])},
   loadLib(){if(window.supabase)return Promise.resolve();return new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';sc.onload=res;sc.onerror=rej;document.head.appendChild(sc)})},
   set(st){this.state=st;const d=document.getElementById('syncdot');if(d)d.className='syncdot'+(st==='ready'?' on':st==='sync'?' sync':st==='err'?' err':'')},
   async push(t,r){const s=settings();if(!s.syncEnabled)return;await this.init();if(!this.sb)return;try{const{error}=await this.sb.from('workbench_records').upsert({id:r.id,type:t,data:r,updated_at:r.updatedAt,user_id:s.userId});if(error){this.lastErr='push:'+error.message;this.set('err')}}else{this.set('ready')}catch(e){this.lastErr='push:'+e.message;this.set('err')}},
@@ -1463,7 +1463,8 @@ if('serviceWorker' in navigator){
 }
 Sync.init();
 if(settings().syncEnabled)setTimeout(()=>Sync.pull(),800);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&settings().syncEnabled)setTimeout(()=>Sync.pull(),300)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&settings().syncEnabled)setTimeout(()=>{try{Sync.pull()}catch(e){}},300)});
+navigator.serviceWorker&&navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='SW_UPDATED')location.reload()});
 let deferredPrompt;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e});
 </script>
 </body>
