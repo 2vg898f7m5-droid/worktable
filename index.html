@@ -120,7 +120,11 @@ input,textarea,select{font-family:inherit;font-size:inherit;color:inherit;backgr
 
 /* ====== project ====== */
 .proj{background:var(--surface);border:1px solid var(--border);border-radius:var(--rc);padding:var(--s4);margin-bottom:var(--s2)}
-.proj .ph{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--s2);margin-bottom:var(--s2)}
+.proj .ph{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--s2);margin-bottom:var(--s2);cursor:pointer}
+.proj-toggle{flex:none;width:20px;height:20px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);transition:transform .2s;margin-top:2px}
+.proj.collapsed .proj-toggle{transform:rotate(-90deg)}
+.proj.collapsed .proj-flow,.proj.collapsed .stage-sec,.proj.collapsed .btnrow,.proj.collapsed .pbar,.proj.collapsed .pstat{display:none}
+.proj.collapsed .ph{margin-bottom:0}
 .proj .pname{font-size:16px;font-weight:600}
 .proj .pnote{font-size:12.5px;color:var(--text-muted);margin-top:2px}
 .proj .spent{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -533,7 +537,8 @@ const IC={
   catOther:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
   check2:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg>',
   ringDone:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-5"/></svg>',
-  file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>'
+  file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>',
+  chevron:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M6 9l6 6 6-6"/></svg>'
 };
 const TABS=[
   {k:'home',label:'Home',icon:IC.home},
@@ -649,7 +654,8 @@ function studyMini(p){const pct=progPct(p);const cc=load('study').filter(c=>c.pa
 function projCard(p,mini){
   const sp=spent(p),rem=Number(p.budget||0)-sp,bpct=p.budget&&p.budgetMode==='budget'?Math.round(sp/p.budget*100):0,pp=progPct(p);
   const bMode=p.budgetMode||'expense';
-  let s=`<div class="proj"><div class="ph"><div><div class="pname">${esc(p.name)}</div>${p.note?`<div class="pnote">${esc(p.note)}</div>`:''}</div>`;
+  const collapsed=isCollapsed(p.id);
+  let s=`<div class="proj ${collapsed?'collapsed':''}"><div class="ph" onclick="toggleCollapse('${p.id}')"><div class="proj-toggle">${IC.chevron}</div><div style="flex:1;min-width:0"><div class="pname">${esc(p.name)}</div>${p.note?`<div class="pnote">${esc(p.note)}</div>`:''}</div>`;
   if(bMode==='budget'&&p.budget){
     s+=`<div class="spent">${money(sp)}<small> / ${money(p.budget)}</small></div></div>`;
     s+=`<div class="pbar"><i style="width:${bpct}%"></i></div><div class="pstat"><span>已用 ${bpct}% · 剩 ${money(rem)}</span><span>进度 ${pp}%</span></div>`;
@@ -1152,6 +1158,8 @@ function fmtDate(d){if(!d)return'';try{const x=new Date(d);if(x.toDateString()==
 function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 
 /* ====== actions ====== */
+function isCollapsed(id){try{return JSON.parse(localStorage.getItem('wb_collapsed')||'[]').includes(id)}catch(e){return false}}
+function toggleCollapse(id){const c=JSON.parse(localStorage.getItem('wb_collapsed')||'[]');const i=c.indexOf(id);if(i>=0)c.splice(i,1);else c.push(id);localStorage.setItem('wb_collapsed',JSON.stringify(c));render()}
 function toggleTodo(id){const a=load('todos'),i=a.findIndex(x=>x.id===id);if(i>=0){a[i].done=!a[i].done;a[i].updatedAt=now();save('todos',a);Sync.push('todo',a[i]);render()}}
 function toggleItem(pid,iid){const p=rec('projects',pid);const it=(p.items||[]).find(x=>x.id===iid);if(it){it.done=!it.done;upsert('projects',p);Sync.push('project',p);syncStages(pid);render()}}
 function advanceWeek(id){const a=load('study'),i=a.findIndex(x=>x.id===id);if(i>=0){a[i].currentWeek=Math.min(a[i].totalWeeks||1,(a[i].currentWeek||0)+1);a[i].updatedAt=now();save('study',a);Sync.push('study',a[i]);render()}}
