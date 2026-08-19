@@ -171,6 +171,19 @@ input,textarea,select{font-family:inherit;font-size:inherit;color:inherit;backgr
 .file-del{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.4);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;opacity:0}
 .file-card:active .file-del{opacity:1}
 .stage-badge{font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:var(--rf);background:var(--accent-soft);color:var(--accent-text);flex:none;cursor:pointer;white-space:nowrap}
+/* stage sections (grouped layout) */
+.stage-sec{margin-top:var(--s2);border:1px solid var(--border);border-radius:var(--rc);overflow:hidden}
+.stage-sec-hd{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--surface-2);border-bottom:1px solid var(--border)}
+.stage-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--text-faint)}
+.stage-dot.s-done{background:var(--success)}
+.stage-dot.s-progress{background:var(--accent)}
+.stage-dot.s-pending{background:var(--text-faint)}
+.stage-sec-name{font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0}
+.stage-sec-meta{font-size:10px;color:var(--text-faint);white-space:nowrap}
+.stage-sec-body{padding:6px 10px}
+.stage-sec-body .item-block:last-child{border-bottom:none}
+.stage-sec-add{display:flex;gap:6px;padding:4px 10px 8px}
+.stage-sec-add button{font-size:11px;padding:4px 10px;border-radius:var(--rf);border:1px dashed var(--border-strong);background:transparent;color:var(--text-muted)}
 .item-exps .exprow .eamt{font-size:12px}
 .item-exps .exprow .edel{opacity:.3;font-size:10px}
 .item-exps .exprow:active .edel{opacity:1}
@@ -645,50 +658,54 @@ function projCard(p,mini){
     s+=`<div class="pstat"><span>进度 ${pp}%</span></div>`;
   }
   if(!mini){
-    /* flow stages — SVG flowchart */
     const stages=p.stages||[];
-    s+=`<div class="proj-flow"><div class="et"><span>流程图 (${stages.length})</span><button class="pill soft" onclick="addStage('${p.id}')">+ 阶段</button></div>`;
-    if(stages.length){
-      s+=renderFlowChart(p);
-    } else {
-      s+='<div style="color:var(--text-faint);font-size:12px;padding:4px 0">添加阶段后自动生成流程图，小项可关联阶段自动同步进度</div>';
-    }
+    const allItems=p.items||[];
+    const allFiles=p.attachments||[];
+    /* SVG flow chart */
+    s+=`<div class="proj-flow"><div class="et"><span>流程图 (${stages.length})</span><button class="pill soft" onclick="addStage('${p.id}')">+ 流程</button></div>`;
+    if(stages.length){s+=renderFlowChart(p)}else{s+='<div style="color:var(--text-faint);font-size:12px;padding:4px 0">输入整体流程（如：报名 准备材料 入库 面签），自动拆分为阶段</div>'}
     s+='</div>';
-    /* attachments */
-    const files=p.attachments||[];
-    s+=`<div class="proj-files"><div class="et"><span>资料 (${files.length})</span><button class="pill soft" onclick="document.getElementById('fileinput_${p.id}').click()">+ 上传</button></div>`;
-    s+=`<input type="file" id="fileinput_${p.id}" style="display:none" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onchange="handleFileUpload('${p.id}',this.files[0])">`;
-    if(files.length){
-      s+='<div class="file-grid">';
-      files.forEach(f=>{
-        const isImg=f.type==='image';
-        s+=`<div class="file-card" onclick="viewAttachment('${p.id}','${f.id}')">`;
-        s+=isImg?`<div class="file-thumb"><img src="${f.data}" alt=""></div>`:`<div class="file-thumb">${IC.file}</div>`;
-        s+=`<div class="file-name">${esc(f.name)}</div>`;
-        s+=`<div class="file-del" onclick="event.stopPropagation();delAttachment('${p.id}','${f.id}')">✕</div>`;
+    /* stage sections — group items & files by stage */
+    if(stages.length){
+      stages.forEach(stg=>{
+        const st=stg.status||'pending';
+        const dotCls=st==='done'?'s-done':st==='progress'?'s-progress':'s-pending';
+        const si=allItems.filter(it=>it.stageId===stg.id);
+        const sf=allFiles.filter(f=>f.stageId===stg.id);
+        s+=`<div class="stage-sec">`;
+        s+=`<div class="stage-sec-hd"><span class="stage-dot ${dotCls}"></span><span class="stage-sec-name">${esc(stg.name)}</span><span class="stage-sec-meta">${si.length}项 · ${sf.length}资料</span></div>`;
+        s+=`<input type="file" id="fileinput_${stg.id}" style="display:none" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onchange="handleFileUpload('${p.id}','${stg.id}',this.files[0])">`;
+        s+=`<div class="stage-sec-body">`;
+        si.forEach(it=>{
+          const itExp=(it.expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0)+(it.amount||0);
+          s+=`<div class="item-block ${it.done?'done':''}">`;
+          s+=`<div class="itemrow"><div class="ichk" onclick="event.stopPropagation();toggleItem('${p.id}','${it.id}')">${IC.chek}</div><div class="iname" onclick="editItem('${p.id}','${it.id}')">${esc(it.title)}</div>${itExp?`<div class="iamt">${money(itExp)}</div>`:''}<button class="item-add-exp" onclick="event.stopPropagation();addItemExpenseInline('${p.id}','${it.id}')">+</button></div>`;
+          if(it.expenses&&it.expenses.length){s+='<div class="item-exps">';it.expenses.forEach(e=>{s+=`<div class="exprow"><span class="eamt">${money(e.amount)}</span><span class="ecat">${esc(e.note||e.category||'')} · ${fmtDate(e.date||'')}</span><button class="edel" onclick="event.stopPropagation();delItemExpenseInline('${p.id}','${it.id}','${e.id}')">删除</button></div>`});s+='</div>'}
+          s+='</div>';
+        });
+        if(sf.length){s+='<div class="file-grid" style="margin-top:4px">';sf.forEach(f=>{const isImg=f.type==='image';s+=`<div class="file-card" onclick="viewAttachment('${p.id}','${f.id}')">`;s+=isImg?`<div class="file-thumb"><img src="${f.data}" alt=""></div>`:`<div class="file-thumb">${IC.file}</div>`;s+=`<div class="file-name">${esc(f.name)}</div>`;s+=`<div class="file-del" onclick="event.stopPropagation();delAttachment('${p.id}','${f.id}')">✕</div>`;s+='</div>'});s+='</div>'}
+        if(!si.length&&!sf.length){s+='<div style="color:var(--text-faint);font-size:12px;padding:2px 0">添加小项或上传资料</div>'}
+        s+='</div>';
+        s+=`<div class="stage-sec-add"><button onclick="addItem('${p.id}','${stg.id}')">+ 小项</button><button onclick="document.getElementById('fileinput_${stg.id}').click()">📎 上传资料</button></div>`;
         s+='</div>';
       });
-      s+='</div>';
     }
-    s+='</div>';
-    /* subtasks */
-    s+=`<div class="items"><div class="et"><span>小项 (${(p.items||[]).length})</span><button class="pill soft" onclick="addItem('${p.id}')">+ 添加</button></div>`;
-    (p.items||[]).forEach(it=>{
-      const itExp=(it.expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0)+(it.amount||0);
-      const stgName=it.stageId&&stages.find(x=>x.id===it.stageId)?stages.find(x=>x.id===it.stageId).name:'';
-      s+=`<div class="item-block ${it.done?'done':''}">`;
-      s+=`<div class="itemrow"><div class="ichk" onclick="event.stopPropagation();toggleItem('${p.id}','${it.id}')">${IC.chek}</div><div class="iname" onclick="editItem('${p.id}','${it.id}')">${esc(it.title)}</div>${stgName?`<span class="stage-badge" onclick="event.stopPropagation();editItem('${p.id}','${it.id}')">${esc(stgName)}</span>`:''}${itExp?`<div class="iamt">${money(itExp)}</div>`:''}<button class="item-add-exp" onclick="event.stopPropagation();addItemExpenseInline('${p.id}','${it.id}')">+</button></div>`;
-      if(it.expenses&&it.expenses.length){
-        s+='<div class="item-exps">';
-        it.expenses.forEach(e=>{
-          s+=`<div class="exprow"><span class="eamt">${money(e.amount)}</span><span class="ecat">${esc(e.note||e.category||'')} · ${fmtDate(e.date||'')}</span><button class="edel" onclick="event.stopPropagation();delItemExpenseInline('${p.id}','${it.id}','${e.id}')">删除</button></div>`;
-        });
+    /* unfiled section — items/files not linked to any stage */
+    const unItems=allItems.filter(it=>!it.stageId||!stages.find(x=>x.id===it.stageId));
+    const unFiles=allFiles.filter(f=>!f.stageId||!stages.find(x=>x.id===f.stageId));
+    if(unItems.length||unFiles.length||!stages.length){
+      if(stages.length){s+=`<div class="stage-sec"><div class="stage-sec-hd"><span class="stage-dot s-pending"></span><span class="stage-sec-name">未分类</span><span class="stage-sec-meta">${unItems.length}项 · ${unFiles.length}资料</span></div>`;s+=`<input type="file" id="fileinput_unfiled_${p.id}" style="display:none" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onchange="handleFileUpload('${p.id}',null,this.files[0])"><div class="stage-sec-body">`}
+      unItems.forEach(it=>{
+        const itExp=(it.expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0)+(it.amount||0);
+        s+=`<div class="item-block ${it.done?'done':''}">`;
+        s+=`<div class="itemrow"><div class="ichk" onclick="event.stopPropagation();toggleItem('${p.id}','${it.id}')">${IC.chek}</div><div class="iname" onclick="editItem('${p.id}','${it.id}')">${esc(it.title)}</div>${itExp?`<div class="iamt">${money(itExp)}</div>`:''}<button class="item-add-exp" onclick="event.stopPropagation();addItemExpenseInline('${p.id}','${it.id}')">+</button></div>`;
+        if(it.expenses&&it.expenses.length){s+='<div class="item-exps">';it.expenses.forEach(e=>{s+=`<div class="exprow"><span class="eamt">${money(e.amount)}</span><span class="ecat">${esc(e.note||e.category||'')} · ${fmtDate(e.date||'')}</span><button class="edel" onclick="event.stopPropagation();delItemExpenseInline('${p.id}','${it.id}','${e.id}')">删除</button></div>`});s+='</div>'}
         s+='</div>';
-      }
-      s+='</div>';
-    });
-    if(!(p.items||[]).length)s+='<div class="itemrow" style="color:var(--text-faint);font-size:13px">暂无小项</div>';
-    s+=`</div><div class="btnrow" style="margin-top:var(--s3)"><button class="btn ghost" onclick="editRec('projects','${p.id}')">编辑</button></div>`;
+      });
+      if(unFiles.length){s+='<div class="file-grid" style="margin-top:4px">';unFiles.forEach(f=>{const isImg=f.type==='image';s+=`<div class="file-card" onclick="viewAttachment('${p.id}','${f.id}')">`;s+=isImg?`<div class="file-thumb"><img src="${f.data}" alt=""></div>`:`<div class="file-thumb">${IC.file}</div>`;s+=`<div class="file-name">${esc(f.name)}</div>`;s+=`<div class="file-del" onclick="event.stopPropagation();delAttachment('${p.id}','${f.id}')">✕</div>`;s+='</div>'});s+='</div>'}
+      if(stages.length){s+=`</div><div class="stage-sec-add"><button onclick="addItem('${p.id}',null)">+ 小项</button><button onclick="document.getElementById('fileinput_unfiled_${p.id}').click()">📎 上传资料</button></div></div>`}
+    }
+    s+=`<div class="btnrow" style="margin-top:var(--s3)"><button class="btn ghost" onclick="editRec('projects','${p.id}')">编辑项目</button></div>`;
   }
   s+='</div>';return s;
 }
@@ -1142,7 +1159,7 @@ function delRec(t,id){if(!confirm('确定删除?'))return;del(t,id);Sync.remove(
 function addExpense(pid){openSheet(`<div class="sh"><h2>记一笔花销</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>金额</label><input type="number" id="eamount" placeholder="0" inputmode="decimal"></div><div class="field"><label>分类</label><input type="text" id="ecat" placeholder="如:硬件/外包/订阅"></div><div class="field"><label>备注</label><input type="text" id="enote" placeholder="可选"></div><div class="field"><label>日期</label><input type="date" id="edate" value="${fmtISO(new Date())}"></div><div class="btnrow"><button class="btn primary" onclick="saveExp('${pid}')">保存</button></div>`)}
 function saveExp(pid){const p=rec('projects',pid);const e={id:uid(),amount:Number(document.getElementById('eamount').value)||0,category:document.getElementById('ecat').value,note:document.getElementById('enote').value,date:document.getElementById('edate').value};p.expenses=p.expenses||[];p.expenses.push(e);upsert('projects',p);Sync.push('project',p);closeModal();render()}
 function delExpense(pid,eid){const p=rec('projects',pid);p.expenses=(p.expenses||[]).filter(e=>e.id!==eid);upsert('projects',p);Sync.push('project',p);render()}
-function addItem(pid){const p=rec('projects',pid);const stages=p.stages||[];let stgField='';if(stages.length)stgField=`<div class="field"><label>关联流程</label>${seg('i_stage',['none|无'].concat(stages.map(s=>s.id+'|'+s.name)),'none')}</div>`;openSheet(`<div class="sh"><h2>小项</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>标题</label><input id="i_title" placeholder="如:需求评审"></div>${stgField}<div class="btnrow"><button class="btn primary" onclick="saveItem('${pid}')">保存</button></div>`)}
+function addItem(pid,presetStageId){const p=rec('projects',pid);const stages=p.stages||[];let stgField='';if(stages.length){const sel=presetStageId||'none';stgField=`<div class="field"><label>关联流程</label>${seg('i_stage',['none|无'].concat(stages.map(s=>s.id+'|'+s.name)),sel)}</div>`}openSheet(`<div class="sh"><h2>小项</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>标题</label><input id="i_title" placeholder="如:身份证复印件"></div>${stgField}<div class="btnrow"><button class="btn primary" onclick="saveItem('${pid}')">保存</button></div>`)}
 function editItem(pid,iid){const p=rec('projects',pid);const it=(p.items||[]).find(x=>x.id===iid);if(!it)return;const iex=it.expenses||[];const itTotal=iex.reduce((s,e)=>s+Number(e.amount||0),0)+(it.amount||0);const stages=p.stages||[];let body=`<div class="sh"><h2>小项</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>标题</label><input id="i_title" value="${esc(it.title)}"></div>`;if(stages.length)body+=`<div class="field"><label>关联流程</label>${seg('i_stage',['none|无'].concat(stages.map(s=>s.id+'|'+s.name)),it.stageId||'none')}</div>`;body+=`<div class="field"><label>花销记录 (${iex.length}笔 · 共${money(itTotal)})</label>`;body+=`<div class="item-expenses">`;if(iex.length)iex.forEach(e=>body+=`<div class="exprow"><span class="eamt">${money(e.amount)}</span><span class="ecat">${esc(e.category||'其他')} · ${esc(e.note||'')} · ${fmtDate(e.date||'')}</span><button class="edel" onclick="delItemExpense('${pid}','${iid}','${e.id}')">删除</button></div>`);else body+='<div class="exprow" style="color:var(--text-faint)">暂无花销</div>';body+='</div>';body+=`<button class="btn ghost" style="margin-top:var(--s2);width:100%" onclick="addItemExpense('${pid}','${iid}')">+ 记一笔花销</button>`;body+=`<div class="btnrow" style="margin-top:var(--s3)"><button class="btn primary" onclick="saveItem('${pid}','${iid}')">保存</button><button class="btn danger" onclick="delItem('${pid}','${iid}');closeModal()">删除</button></div>`;openSheet(body)}
 function addItemExpense(pid,iid){const p=rec('projects',pid);const it=(p.items||[]).find(x=>x.id===iid);if(it){it.title=val('i_title');upsert('projects',p);Sync.push('project',p)}openSheet(`<div class="sh"><h2>小项花销</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>金额</label><input type="number" id="ie_amount" placeholder="0" inputmode="decimal"></div><div class="field"><label>分类</label><input type="text" id="ie_cat" placeholder="如:硬件/外包/订阅"></div><div class="field"><label>备注</label><input type="text" id="ie_note" placeholder="可选"></div><div class="field"><label>日期</label><input type="date" id="ie_date" value="${fmtISO(new Date())}"></div><div class="btnrow"><button class="btn primary" onclick="saveItemExpense('${pid}','${iid}')">保存</button></div>`)}
 function saveItemExpense(pid,iid){const p=rec('projects',pid);const it=(p.items||[]).find(x=>x.id===iid);if(!it)return;it.expenses=it.expenses||[];it.expenses.push({id:uid(),amount:Number(val('ie_amount')||0),category:val('ie_cat'),note:val('ie_note'),date:val('ie_date')||fmtISO(new Date())});upsert('projects',p);Sync.push('project',p);editItem(pid,iid)}
@@ -1153,14 +1170,14 @@ function delItemExpenseInline(pid,iid,eid){const p=rec('projects',pid);const it=
 function saveItem(pid,iid){const p=rec('projects',pid);p.items=p.items||[];const stgId=p.stages&&p.stages.length?(segVal('i_stage')||'none'):null;if(iid){const it=p.items.find(x=>x.id===iid);if(it){it.title=val('i_title');if(stgId!==null)it.stageId=stgId==='none'?null:stgId}}else p.items.push({id:uid(),title:val('i_title'),done:false,expenses:[],stageId:stgId==='none'?null:stgId});upsert('projects',p);Sync.push('project',p);syncStages(pid);closeModal();render()}
 function delItem(pid,iid){const p=rec('projects',pid);p.items=(p.items||[]).filter(x=>x.id!==iid);upsert('projects',p);Sync.push('project',p);syncStages(pid);render()}
 /* flow stages + SVG flowchart + auto-sync */
-function addStage(pid){openSheet(`<div class="sh"><h2>流程阶段</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>阶段名称</label><input id="stg_name" placeholder="如:需求分析、设计、开发、测试"></div><div class="btnrow"><button class="btn primary" onclick="saveStage('${pid}')">保存</button></div><div style="font-size:11px;color:var(--text-faint);margin-top:var(--s2)">小项可关联阶段，完成后自动同步流程进度</div>`)}
-function saveStage(pid){const p=rec('projects',pid);p.stages=p.stages||[];p.stages.push({id:uid(),name:val('stg_name'),status:'pending'});upsert('projects',p);Sync.push('project',p);closeModal();render()}
+function addStage(pid){openSheet(`<div class="sh"><h2>添加流程</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>流程内容</label><textarea id="stg_name" rows="3" placeholder="输入整体流程，自动拆分&#10;如：报名 准备材料 入库 面签&#10;或每行一个阶段"></textarea></div><div class="btnrow"><button class="btn primary" onclick="saveStage('${pid}')">保存</button></div><div style="font-size:11px;color:var(--text-faint);margin-top:var(--s2)">支持逗号、空格、换行分隔，自动拆分为多个阶段</div>`)}
+function saveStage(pid){const p=rec('projects',pid);p.stages=p.stages||[];const raw=val('stg_name');const names=raw.split(/[\n,，、\s]+/).map(s=>s.trim()).filter(s=>s.length);if(!names.length)return;names.forEach(n=>p.stages.push({id:uid(),name:n,status:'pending'}));upsert('projects',p);Sync.push('project',p);closeModal();render()}
 function cycleStage(pid,sid){const p=rec('projects',pid);const stg=(p.stages||[]).find(x=>x.id===sid);if(!stg)return;const linked=(p.items||[]).filter(it=>it.stageId===sid);if(linked.length)return;const order=['pending','progress','done'];stg.status=order[(order.indexOf(stg.status||'pending')+1)%3];upsert('projects',p);Sync.push('project',p);render()}
 function delStage(pid,sid){const p=rec('projects',pid);p.stages=(p.stages||[]).filter(x=>x.id!==sid);(p.items||[]).forEach(it=>{if(it.stageId===sid)it.stageId=null});upsert('projects',p);Sync.push('project',p);render()}
 function syncStages(pid){const p=rec('projects',pid);if(!p.stages||!p.stages.length)return;(p.stages).forEach(stg=>{const linked=(p.items||[]).filter(it=>it.stageId===stg.id);if(!linked.length)return;const done=linked.filter(it=>it.done).length;if(done===0)stg.status='pending';else if(done===linked.length)stg.status='done';else stg.status='progress'});upsert('projects',p);Sync.push('project',p)}
 function renderFlowChart(p){const stages=p.stages||[];if(!stages.length)return'';const items=p.items||[];const NW=132,NH=58,GAP=28;const totalW=stages.length*(NW+GAP)-GAP;const svgW=Math.max(totalW,200);const FC={done:{f:'#E8E8D5',s:'#6B7B4A',t:'#5A6A3A'},progress:{f:'#F2DDD5',s:'#9B3D2A',t:'#6E2A1A'},pending:{f:'#E8E0CC',s:'rgba(126,104,85,.25)',t:'#7E6855'}};let svg=`<svg viewBox="0 0 ${svgW} ${NH+16}" style="width:100%;max-width:${svgW}px;height:auto;overflow:visible" xmlns="http://www.w3.org/2000/svg">`;svg+='<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8Z" fill="#A89888"/></marker></defs>';stages.forEach((stg,i)=>{const x=i*(NW+GAP),y=8;const st=stg.status||'pending';const c=FC[st]||FC.pending;const linked=items.filter(it=>it.stageId===stg.id);const done=linked.filter(it=>it.done).length;const pct=linked.length?Math.round(done/linked.length*100):(st==='done'?100:0);const isAuto=linked.length>0;if(i<stages.length-1){svg+=`<line x1="${x+NW+2}" y1="${y+NH/2}" x2="${x+NW+GAP-2}" y2="${y+NH/2}" stroke="#A89888" stroke-width="1.5" marker-end="url(#ah)"/>`}svg+=`<rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="11" fill="${c.f}" stroke="${c.s}" stroke-width="1.5"/>`;const nm=stg.name.length>9?stg.name.slice(0,8)+'…':stg.name;svg+=`<text x="${x+NW/2}" y="${y+22}" text-anchor="middle" font-size="12" font-weight="600" fill="${c.t}">${esc(nm)}</text>`;if(isAuto){svg+=`<text x="${x+NW/2}" y="${y+40}" text-anchor="middle" font-size="10" fill="${c.t}" opacity=".85">${done}/${linked.length} · ${pct}%</text>`}else{svg+=`<text x="${x+NW/2}" y="${y+40}" text-anchor="middle" font-size="10" fill="${c.t}" opacity=".6">${st==='done'?'已完成':st==='progress'?'进行中':'待开始'}</text>`}svg+=`<rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="11" fill="transparent" style="cursor:${isAuto?'default':'pointer'}" ${isAuto?'':`onclick="cycleStage('${p.id}','${stg.id}')"`}/>`;svg+=`<text x="${x+NW-8}" y="${y+12}" text-anchor="end" font-size="8" fill="${c.t}" opacity=".4" style="cursor:pointer" onclick="event.stopPropagation();delStage('${p.id}','${stg.id}')">✕</text>`});svg+='</svg>';return svg}
 /* attachments */
-function handleFileUpload(pid,file){if(!file)return;if(file.size>3*1024*1024){alert('文件过大(>3MB),请压缩后上传');return}const reader=new FileReader();reader.onload=()=>{const p=rec('projects',pid);p.attachments=p.attachments||[];p.attachments.push({id:uid(),name:file.name,type:file.type.startsWith('image/')?'image':'file',mime:file.type,data:reader.result,size:file.size,date:fmtISO(new Date())});upsert('projects',p);Sync.push('project',p);render()};reader.readAsDataURL(file)}
+function handleFileUpload(pid,stgId,file){if(!file)return;if(file.size>3*1024*1024){alert('文件过大(>3MB),请压缩后上传');return}const reader=new FileReader();reader.onload=()=>{const p=rec('projects',pid);p.attachments=p.attachments||[];p.attachments.push({id:uid(),name:file.name,type:file.type.startsWith('image/')?'image':'file',mime:file.type,data:reader.result,size:file.size,date:fmtISO(new Date()),stageId:stgId||null});upsert('projects',p);Sync.push('project',p);render()};reader.readAsDataURL(file)}
 function viewAttachment(pid,aid){const p=rec('projects',pid);const f=(p.attachments||[]).find(x=>x.id===aid);if(!f)return;if(f.type==='image'){openSheet(`<div class="sh"><h2>${esc(f.name)}</h2><button onclick="closeModal()">${IC.back}</button></div><img src="${f.data}" style="width:100%;border-radius:var(--rc);margin-bottom:var(--s3)"><div class="btnrow"><a class="btn ghost" href="${f.data}" download="${esc(f.name)}" style="text-decoration:none;display:inline-block">下载</a><button class="btn danger" onclick="delAttachment('${pid}','${f.id}');closeModal()">删除</button></div>`)}else{openSheet(`<div class="sh"><h2>${esc(f.name)}</h2><button onclick="closeModal()">${IC.back}</button></div><div style="text-align:center;padding:var(--s4)">${IC.file}<div style="margin-top:var(--s2);color:var(--text-muted);font-size:13px">${(f.size/1024).toFixed(1)} KB · ${esc(f.mime||'文件')}</div></div><div class="btnrow"><a class="btn ghost" href="${f.data}" download="${esc(f.name)}" style="text-decoration:none;display:inline-block">下载</a><button class="btn danger" onclick="delAttachment('${pid}','${f.id}');closeModal()">删除</button></div>`)}}
 function delAttachment(pid,aid){const p=rec('projects',pid);p.attachments=(p.attachments||[]).filter(x=>x.id!==aid);upsert('projects',p);Sync.push('project',p);render()}
 function addSubPlan(parentId){editId=null;const parent=rec('study',parentId);const isMidParent=parent&&(parent.parentId||parent.isExec);const defType=isMidParent?'exec':'mid';openSheet(`<div class="sh"><h2>${defType==='exec'?'执行计划':'子计划'}</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>标题</label><input id="f_title" placeholder="${defType==='exec'?'如:每天背50个单词':'如:雅思听力单词'}"></div><div class="field"><label>类型</label>${seg('f_type',['mid|中级计划','exec|执行计划'],defType,'pickPlanType')}</div><div class="field" id="dailyField" style="display:${defType==='exec'?'block':'none'}"><label>每日目标(如:50)</label><input id="f_daily" type="number" placeholder="如:50"></div><div class="field" id="weekField" style="display:${defType==='mid'?'block':'none'}"><label>总周数</label><input id="f_weeks" type="number" value="8" min="1"></div><div class="field"><label>备注</label><textarea id="f_note"></textarea></div><div class="btnrow"><button class="btn primary" onclick="saveSubPlan('${parentId}')">保存</button></div>`)}
