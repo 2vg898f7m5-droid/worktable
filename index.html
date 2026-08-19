@@ -797,7 +797,6 @@ function viewMoney(){
 function viewNote(){
   const n=load('notes').sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
   let s=pagehead('Idea',n.length+' 条灵感','notes');
-  if(!n.length)return s+empty('还没有灵感','记录你的想法、灵感、思考');
   s+='<div class="bubble-canvas" id="bubbleCanvas">';
   // --- Fireflies (animated glowing dots) ---
   const ffPos=[[10,20],[25,15],[40,25],[55,10],[70,20],[85,15],[15,40],[30,35],[45,45],[60,38],[75,42],[20,55],[35,60],[50,52],[65,58],[80,50],[15,70],[30,75],[45,68],[60,75]];
@@ -812,6 +811,13 @@ function viewNote(){
   // --- Pulsing glow orbs near lantern and branch ---
   s+=`<div class="glow-orb" style="left:5%;bottom:8%;width:120px;height:120px;animation-delay:0s"></div>`;
   s+=`<div class="glow-orb" style="right:8%;top:5%;width:80px;height:80px;animation-delay:3s;background:radial-gradient(circle,rgba(200,180,140,.06),transparent 70%)"></div>`;
+  if(!n.length){
+    s+='<div class="empty-state-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:5;pointer-events:none">';
+    s+='<div style="font-size:48px;opacity:.3;margin-bottom:12px">'+IC.idea+'</div>';
+    s+='<div style="color:var(--text-muted);font-size:18px;font-weight:600;margin-bottom:6px">还没有灵感</div>';
+    s+='<div style="color:var(--text-faint);font-size:14px">记录你的想法、灵感、思考</div>';
+    s+='</div>';
+  }
   s+='</div>';
   return s;
 }
