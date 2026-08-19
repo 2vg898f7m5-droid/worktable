@@ -1357,7 +1357,19 @@ document.getElementById('btnSettings').onclick=openSettings;
 document.getElementById('btnSync').onclick=()=>Sync.pull();
 document.getElementById('today').textContent=new Date().toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'short'});
 buildNav();render();
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').then(reg=>{
+    reg.addEventListener('updatefound',()=>{
+      const nw=reg.installing;if(!nw)return;
+      nw.addEventListener('statechange',()=>{
+        if(nw.state==='activated'&&!navigator.serviceWorker.controller)location.reload();
+      });
+    });
+  }).catch(()=>{});
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    location.reload();
+  });
+}
 Sync.init();
 if(settings().syncEnabled)setTimeout(()=>Sync.pull(),800);
 let deferredPrompt;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e});
