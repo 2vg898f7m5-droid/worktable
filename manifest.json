@@ -1,6 +1,6 @@
 {
-  "name": "我的工作台",
-  "short_name": "工作台",
+  "name": "Worktable",
+  "short_name": "Worktable",
   "description": "个人工作台:待办、项目、学习、理财、愿望清单、灵感笔记、旅行、日记,跨设备同步",
   "lang": "zh-CN",
   "start_url": "./index.html",
