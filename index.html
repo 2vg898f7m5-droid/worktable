@@ -148,6 +148,28 @@ input,textarea,select{font-family:inherit;font-size:inherit;color:inherit;backgr
 .item-block+.item-block{border-top:1px solid rgba(126,104,85,.06)}
 .item-exps{padding-left:26px;padding-top:2px;padding-bottom:2px}
 .item-exps .exprow{padding:3px 0;font-size:12px}
+/* flow stages */
+.proj-flow{margin-top:var(--s3);border-top:1px dashed var(--border);padding-top:var(--s2)}
+.flow-track{display:flex;align-items:center;gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:thin}
+.flow-track::-webkit-scrollbar{height:3px}
+.stage{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative}
+.stage-chip{padding:6px 14px;border-radius:var(--rf);font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;border:1.5px solid var(--border-strong);background:var(--surface-2);color:var(--text-muted);transition:all .15s}
+.stage-chip.s-pending{border-color:var(--border-strong);color:var(--text-faint)}
+.stage-chip.s-progress{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-text)}
+.stage-chip.s-done{border-color:var(--success);background:var(--success-soft);color:var(--success);text-decoration:line-through;opacity:.7}
+.stage-arrow{flex:none;color:var(--text-faint);font-size:14px;margin:0 -2px;align-self:center;margin-top:8px}
+.stage-del{font-size:9px;color:var(--danger);opacity:0;cursor:pointer;margin-top:1px}
+.stage:active .stage-del{opacity:.7}
+/* attachments */
+.proj-files{margin-top:var(--s3);border-top:1px dashed var(--border);padding-top:var(--s2)}
+.file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:var(--s2)}
+.file-card{position:relative;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;background:var(--surface-2)}
+.file-card:active{border-color:var(--accent)}
+.file-thumb{width:100%;height:60px;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--surface-3);overflow:hidden}
+.file-thumb img{width:100%;height:100%;object-fit:cover}
+.file-name{padding:4px 6px;font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-del{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.4);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;opacity:0}
+.file-card:active .file-del{opacity:1}
 .item-exps .exprow .eamt{font-size:12px}
 .item-exps .exprow .edel{opacity:.3;font-size:10px}
 .item-exps .exprow:active .edel{opacity:1}
@@ -496,7 +518,8 @@ const IC={
   catCollect:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l3 6-9 12L3 9z"/><path d="M3 9h18M12 21V9"/></svg>',
   catOther:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
   check2:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg>',
-  ringDone:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-5"/></svg>'
+  ringDone:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-5"/></svg>',
+  file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>'
 };
 const TABS=[
   {k:'home',label:'Home',icon:IC.home},
@@ -621,6 +644,36 @@ function projCard(p,mini){
     s+=`<div class="pstat"><span>进度 ${pp}%</span></div>`;
   }
   if(!mini){
+    /* flow stages */
+    const stages=p.stages||[];
+    s+=`<div class="proj-flow"><div class="et"><span>流程 (${stages.length})</span><button class="pill soft" onclick="addStage('${p.id}')">+ 阶段</button></div>`;
+    if(stages.length){
+      s+='<div class="flow-track">';
+      stages.forEach((stg,i)=>{
+        if(i>0)s+='<span class="stage-arrow">→</span>';
+        s+=`<div class="stage"><div class="stage-chip s-${stg.status||'pending'}" onclick="cycleStage('${p.id}','${stg.id}')">${esc(stg.name)}</div><span class="stage-del" onclick="event.stopPropagation();delStage('${p.id}','${stg.id}')">删除</span></div>`;
+      });
+      s+='</div>';
+    }
+    s+='</div>';
+    /* attachments */
+    const files=p.attachments||[];
+    s+=`<div class="proj-files"><div class="et"><span>资料 (${files.length})</span><button class="pill soft" onclick="document.getElementById('fileinput_${p.id}').click()">+ 上传</button></div>`;
+    s+=`<input type="file" id="fileinput_${p.id}" style="display:none" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onchange="handleFileUpload('${p.id}',this.files[0])">`;
+    if(files.length){
+      s+='<div class="file-grid">';
+      files.forEach(f=>{
+        const isImg=f.type==='image';
+        s+=`<div class="file-card" onclick="viewAttachment('${p.id}','${f.id}')">`;
+        s+=isImg?`<div class="file-thumb"><img src="${f.data}" alt=""></div>`:`<div class="file-thumb">${IC.file}</div>`;
+        s+=`<div class="file-name">${esc(f.name)}</div>`;
+        s+=`<div class="file-del" onclick="event.stopPropagation();delAttachment('${p.id}','${f.id}')">✕</div>`;
+        s+='</div>';
+      });
+      s+='</div>';
+    }
+    s+='</div>';
+    /* subtasks */
     s+=`<div class="items"><div class="et"><span>小项 (${(p.items||[]).length})</span><button class="pill soft" onclick="addItem('${p.id}')">+ 添加</button></div>`;
     (p.items||[]).forEach(it=>{
       const itExp=(it.expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0)+(it.amount||0);
@@ -1100,6 +1153,15 @@ function saveItemExpenseInline(pid,iid){const p=rec('projects',pid);const it=(p.
 function delItemExpenseInline(pid,iid,eid){const p=rec('projects',pid);const it=(p.items||[]).find(x=>x.id===iid);if(!it)return;it.expenses=(it.expenses||[]).filter(e=>e.id!==eid);upsert('projects',p);Sync.push('project',p);render()}
 function saveItem(pid,iid){const p=rec('projects',pid);p.items=p.items||[];if(iid){const it=p.items.find(x=>x.id===iid);if(it){it.title=val('i_title')}}else p.items.push({id:uid(),title:val('i_title'),done:false,expenses:[]});upsert('projects',p);Sync.push('project',p);closeModal();render()}
 function delItem(pid,iid){const p=rec('projects',pid);p.items=(p.items||[]).filter(x=>x.id!==iid);upsert('projects',p);Sync.push('project',p);render()}
+/* flow stages */
+function addStage(pid){openSheet(`<div class="sh"><h2>流程阶段</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>阶段名称</label><input id="stg_name" placeholder="如:需求分析 → 设计 → 开发"></div><div class="field"><label>初始状态</label>${seg('stg_stat',['pending|待开始','progress|进行中','done|已完成'],'pending')}</div><div class="btnrow"><button class="btn primary" onclick="saveStage('${pid}')">保存</button></div>`)}
+function saveStage(pid){const p=rec('projects',pid);p.stages=p.stages||[];p.stages.push({id:uid(),name:val('stg_name'),status:segVal('stg_stat')||'pending'});upsert('projects',p);Sync.push('project',p);closeModal();render()}
+function cycleStage(pid,sid){const p=rec('projects',pid);const stg=(p.stages||[]).find(x=>x.id===sid);if(!stg)return;const order=['pending','progress','done'];stg.status=order[(order.indexOf(stg.status||'pending')+1)%3];upsert('projects',p);Sync.push('project',p);render()}
+function delStage(pid,sid){const p=rec('projects',pid);p.stages=(p.stages||[]).filter(x=>x.id!==sid);upsert('projects',p);Sync.push('project',p);render()}
+/* attachments */
+function handleFileUpload(pid,file){if(!file)return;if(file.size>3*1024*1024){alert('文件过大(>3MB),请压缩后上传');return}const reader=new FileReader();reader.onload=()=>{const p=rec('projects',pid);p.attachments=p.attachments||[];p.attachments.push({id:uid(),name:file.name,type:file.type.startsWith('image/')?'image':'file',mime:file.type,data:reader.result,size:file.size,date:fmtISO(new Date())});upsert('projects',p);Sync.push('project',p);render()};reader.readAsDataURL(file)}
+function viewAttachment(pid,aid){const p=rec('projects',pid);const f=(p.attachments||[]).find(x=>x.id===aid);if(!f)return;if(f.type==='image'){openSheet(`<div class="sh"><h2>${esc(f.name)}</h2><button onclick="closeModal()">${IC.back}</button></div><img src="${f.data}" style="width:100%;border-radius:var(--rc);margin-bottom:var(--s3)"><div class="btnrow"><a class="btn ghost" href="${f.data}" download="${esc(f.name)}" style="text-decoration:none;display:inline-block">下载</a><button class="btn danger" onclick="delAttachment('${pid}','${f.id}');closeModal()">删除</button></div>`)}else{openSheet(`<div class="sh"><h2>${esc(f.name)}</h2><button onclick="closeModal()">${IC.back}</button></div><div style="text-align:center;padding:var(--s4)">${IC.file}<div style="margin-top:var(--s2);color:var(--text-muted);font-size:13px">${(f.size/1024).toFixed(1)} KB · ${esc(f.mime||'文件')}</div></div><div class="btnrow"><a class="btn ghost" href="${f.data}" download="${esc(f.name)}" style="text-decoration:none;display:inline-block">下载</a><button class="btn danger" onclick="delAttachment('${pid}','${f.id}');closeModal()">删除</button></div>`)}}
+function delAttachment(pid,aid){const p=rec('projects',pid);p.attachments=(p.attachments||[]).filter(x=>x.id!==aid);upsert('projects',p);Sync.push('project',p);render()}
 function addSubPlan(parentId){editId=null;const parent=rec('study',parentId);const isMidParent=parent&&(parent.parentId||parent.isExec);const defType=isMidParent?'exec':'mid';openSheet(`<div class="sh"><h2>${defType==='exec'?'执行计划':'子计划'}</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>标题</label><input id="f_title" placeholder="${defType==='exec'?'如:每天背50个单词':'如:雅思听力单词'}"></div><div class="field"><label>类型</label>${seg('f_type',['mid|中级计划','exec|执行计划'],defType,'pickPlanType')}</div><div class="field" id="dailyField" style="display:${defType==='exec'?'block':'none'}"><label>每日目标(如:50)</label><input id="f_daily" type="number" placeholder="如:50"></div><div class="field" id="weekField" style="display:${defType==='mid'?'block':'none'}"><label>总周数</label><input id="f_weeks" type="number" value="8" min="1"></div><div class="field"><label>备注</label><textarea id="f_note"></textarea></div><div class="btnrow"><button class="btn primary" onclick="saveSubPlan('${parentId}')">保存</button></div>`)}
 function saveSubPlan(parentId){const type=segVal('f_type'),r={id:uid(),title:val('f_title'),parentId,dailyGoal:Number(val('f_daily')||0),note:val('f_note'),isExec:type==='exec'};if(type!=='exec'){r.totalWeeks=Number(val('f_weeks')||8);r.currentWeek=0}if(type==='exec')r.completions={};upsert('study',r);Sync.push('study',r);closeModal();render()}
 function saveSubPlanEdit(){const type=segVal('f_type'),ex=rec('study',editId);if(!ex)return;ex.title=val('f_title');ex.note=val('f_note');ex.isExec=type==='exec';if(type==='exec'){ex.dailyGoal=Number(val('f_daily')||0);if(!ex.completions)ex.completions={}}else{ex.totalWeeks=Number(val('f_weeks')||8);if(ex.currentWeek==null)ex.currentWeek=0}upsert('study',ex);Sync.push('study',ex);closeModal();render()}
@@ -1144,7 +1206,7 @@ function pickSeg(btn,v){btn.parentNode.querySelectorAll('button').forEach(b=>{b.
 function pickPlanType(btn,v){pickSeg(btn,v);const d=document.getElementById('dailyField');if(d)d.style.display=v==='exec'?'block':'none';const w=document.getElementById('weekField');if(w)w.style.display=v==='mid'?'block':'none'}
 function segVal(id){const b=document.querySelector('#'+id+' .sel');return b?b.dataset.v:''}
 function saveTodo(){const r={id:editId||uid(),title:val('f_title'),due:val('f_due'),priority:segVal('f_pri'),note:val('f_note'),done:rec('todos',editId)?.done||false};upsert('todos',r);Sync.push('todo',r);closeModal();render()}
-function saveProj(){const r=Object.assign(rec('projects',editId)||{expenses:[],items:[]},{id:editId||uid(),name:val('f_name'),budgetMode:segVal('f_bmode')||'expense',budget:Number(val('f_budget')||0),status:segVal('f_stat')==='done'?'done':(segVal('f_stat')||'进行中'),note:val('f_note')});upsert('projects',r);Sync.push('project',r);closeModal();render()}
+function saveProj(){const r=Object.assign(rec('projects',editId)||{expenses:[],items:[],stages:[],attachments:[]},{id:editId||uid(),name:val('f_name'),budgetMode:segVal('f_bmode')||'expense',budget:Number(val('f_budget')||0),status:segVal('f_stat')==='done'?'done':(segVal('f_stat')||'进行中'),note:val('f_note')});upsert('projects',r);Sync.push('project',r);closeModal();render()}
 function saveStudy(){const r={id:editId||uid(),title:val('f_title'),totalWeeks:Number(val('f_total')||1),currentWeek:Number(val('f_cur')||0),note:val('f_note')};upsert('study',r);Sync.push('study',r);closeModal();render()}
 function saveMoney(){const r={id:editId||uid(),kind:segVal('f_kind')||'invest',title:val('f_title'),type:segVal('f_type'),amount:Number(val('f_amount')||0),returned:Number(val('f_returned')||0),status:segVal('f_stat'),priority:segVal('f_pri'),note:val('f_note'),date:val('f_date')||fmtISO(new Date())};upsert('money',r);Sync.push('money',r);closeModal();render()}
 function moneyCats(kind){return kind==='income'?['工资','兼职','奖金','投资收益','其他']:['基金','股票','储蓄','债券','理财','其他']}
