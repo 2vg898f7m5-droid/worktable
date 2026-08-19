@@ -1,4 +1,4 @@
-const CACHE = 'worktable-v10';
+const CACHE = 'worktable-v11';
 const SHELL = [
   './',
   './index.html',
@@ -14,11 +14,12 @@ const EXTERNAL_LIBS = [SUPA_LIB, LEAFLET_CSS, LEAFLET_JS];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(SHELL)).then(() =>
-      Promise.all(EXTERNAL_LIBS.map(url =>
+    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => caches.open(CACHE).then(c => c.addAll(SHELL).catch(() => {})))
+      .then(() => Promise.all(EXTERNAL_LIBS.map(url =>
         fetch(url).then(r => caches.open(CACHE).then(c => c.put(url, r.clone()))).catch(() => {})
-      ))
-    ).then(() => self.skipWaiting())
+      )))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -26,6 +27,7 @@ self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll().then(clients => clients.forEach(c => c.postMessage({type:'SW_UPDATED'}))))
   );
 });
 
@@ -34,16 +36,16 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // Network-first for navigation requests (fresh HTML), fallback to cache
+  // Network-first for navigation (always get fresh HTML)
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req).then(r => { const c = r.clone(); caches.open(CACHE).then(ca => ca.put('./index.html', c)); return r; })
-        .catch(() => caches.match('./index.html'))
+        .catch(() => caches.match('./index.html').then(r => r || new Response('离线，请稍后重试', {status:503})))
     );
     return;
   }
 
-  // Cache-first for app shell + icons
+  // Cache-first for app shell
   if (url.origin === location.origin) {
     e.respondWith(
       caches.match(req).then(cached => cached || fetch(req).then(r => {
@@ -53,7 +55,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Stale-while-revalidate for external libs (Supabase + Leaflet), offline-capable
+  // Stale-while-revalidate for external libs
   if (EXTERNAL_LIBS.includes(req.url)) {
     e.respondWith(
       caches.match(req).then(cached => {
@@ -64,7 +66,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // AMap tiles: cache-first with background update (offline map browsing)
+  // AMap tiles: cache-first
   if (url.hostname.includes('autonavi.com') || url.hostname.includes('is.autonavi.com')) {
     e.respondWith(
       caches.match(req).then(cached => cached || fetch(req).then(r => {
@@ -75,6 +77,6 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Supabase API calls: network only (don't cache responses)
+  // Supabase API: network only
   if (url.hostname.includes('supabase')) return;
 });
