@@ -139,7 +139,8 @@ input,textarea,select{font-family:inherit;font-size:inherit;color:inherit;backgr
 .exprow:active .edel{opacity:1}
 /* project items: checkbox style */
 .itemrow{display:flex;align-items:center;gap:var(--s2);padding:6px 0}
-.itemrow .ichk{width:18px;height:18px;border-radius:6px;border:1.5px solid var(--border-strong);flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.itemrow .ichk{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border-strong);flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;touch-action:manipulation}
+.itemrow .ichk::before{content:'';position:absolute;inset:-12px}
 .itemrow.done .ichk{background:var(--accent);border-color:var(--accent)}
 .itemrow .ichk svg{width:11px;height:11px;color:var(--accent-on);opacity:0}
 .itemrow.done .ichk svg{opacity:1}
@@ -679,8 +680,9 @@ function projCard(p,mini){
         const dotCls=st==='done'?'s-done':st==='progress'?'s-progress':'s-pending';
         const si=allItems.filter(it=>it.stageId===stg.id);
         const sf=allFiles.filter(f=>f.stageId===stg.id);
+        const stgExpTotal=(stg.expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0);
         s+=`<div class="stage-sec">`;
-        s+=`<div class="stage-sec-hd"><span class="stage-dot ${dotCls}"></span><span class="stage-sec-name">${esc(stg.name)}</span><span class="stage-sec-meta">${si.length}项 · ${sf.length}资料</span></div>`;
+        s+=`<div class="stage-sec-hd"><span class="stage-dot ${dotCls}"></span><span class="stage-sec-name">${esc(stg.name)}</span><span class="stage-sec-meta">${si.length}项 · ${sf.length}资料${stgExpTotal?' · '+money(stgExpTotal):''}</span></div>`;
         s+=`<input type="file" id="fileinput_${stg.id}" style="display:none" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onchange="handleFileUpload('${p.id}','${stg.id}',this.files[0])">`;
         s+=`<div class="stage-sec-body">`;
         si.forEach(it=>{
@@ -691,9 +693,10 @@ function projCard(p,mini){
           s+='</div>';
         });
         if(sf.length){s+='<div class="file-grid" style="margin-top:4px">';sf.forEach(f=>{const isImg=f.type==='image';s+=`<div class="file-card" onclick="viewAttachment('${p.id}','${f.id}')">`;s+=isImg?`<div class="file-thumb"><img src="${f.data}" alt=""></div>`:`<div class="file-thumb">${IC.file}</div>`;s+=`<div class="file-name">${esc(f.name)}</div>`;s+=`<div class="file-del" onclick="event.stopPropagation();delAttachment('${p.id}','${f.id}')">✕</div>`;s+='</div>'});s+='</div>'}
-        if(!si.length&&!sf.length){s+='<div style="color:var(--text-faint);font-size:12px;padding:2px 0">添加小项或上传资料</div>'}
+        if(stg.expenses&&stg.expenses.length){s+='<div class="item-exps">';stg.expenses.forEach(e=>{s+=`<div class="exprow"><span class="eamt">${money(e.amount)}</span><span class="ecat">${esc(e.note||'')} · ${fmtDate(e.date||'')}</span><button class="edel" onclick="event.stopPropagation();delStageExpense('${p.id}','${stg.id}','${e.id}')">删除</button></div>`});s+='</div>'}
+        if(!si.length&&!sf.length&&!(stg.expenses&&stg.expenses.length)){s+='<div style="color:var(--text-faint);font-size:12px;padding:2px 0">添加小项、记录花费或上传资料</div>'}
         s+='</div>';
-        s+=`<div class="stage-sec-add"><button onclick="addItem('${p.id}','${stg.id}')">+ 小项</button><button onclick="document.getElementById('fileinput_${stg.id}').click()">📎 上传资料</button></div>`;
+        s+=`<div class="stage-sec-add"><button onclick="addItem('${p.id}','${stg.id}')">+ 小项</button><button onclick="addStageExpense('${p.id}','${stg.id}')">💰 花费</button><button onclick="document.getElementById('fileinput_${stg.id}').click()">📎 上传资料</button></div>`;
         s+='</div>';
       });
     }
@@ -852,7 +855,7 @@ function viewMoney(){
       s+=`<div class="mc-bar"><i style="width:${pct}%;background:${color}"></i></div>`;
       s+='<div class="mc-items">';
       data.items.forEach(x=>{
-        const stColor={待研究:'var(--text-faint)',进行中:'var(--accent)',已决策:'var(--success)'}[x.status]||'var(--text-faint)';
+        const stColor={待研究:'var(--text-faint)',进行中:'var(--accent)',已决策:'var(--success)',已入账:'var(--success)',未入账:'var(--text-faint)'}[x.status]||'var(--text-faint)';
         s+=`<div class="mc-item" onclick="editRec('money','${x.id}')" style="cursor:pointer"><div><span style="font-weight:500">${esc(x.title)}</span><span style="color:var(--text-muted);margin-left:6px;font-size:12px">${x.date?fmtDate(x.date):''}</span></div><span style="color:${stColor};font-weight:600">${money(x.amount)}</span></div>`;
       });
       s+='</div></div>';
@@ -861,7 +864,7 @@ function viewMoney(){
   s+=section('收入记录');
   if(income.length){
     income.forEach(x=>{
-      s+=`<div class="mc-item" onclick="editRec('money','${x.id}')" style="cursor:pointer;border-bottom:1px solid var(--border);padding:8px 0"><div><span style="font-weight:500">${esc(x.title)}</span>${x.type?`<span class="pill muted" style="margin-left:6px">${esc(x.type)}</span>`:''}<span style="color:var(--text-muted);margin-left:6px;font-size:12px">${x.date?fmtDate(x.date):''}</span></div><span style="color:var(--success);font-weight:600">${money(x.amount)}</span></div>`;
+      s+=`<div class="mc-item" onclick="editRec('money','${x.id}')" style="cursor:pointer;border-bottom:1px solid var(--border);padding:8px 0"><div><span style="font-weight:500">${esc(x.title)}</span>${x.type?`<span class="pill muted" style="margin-left:6px">${esc(x.type)}</span>`:''}${x.status?`<span class="pill" style="margin-left:6px;background:${x.status==='已入账'?'var(--success-soft)':'var(--surface-3)'};color:${x.status==='已入账'?'var(--success)':'var(--text-faint)'}">${esc(x.status)}</span>`:''}<span style="color:var(--text-muted);margin-left:6px;font-size:12px">${x.date?fmtDate(x.date):''}</span></div><span style="color:${x.status==='已入账'?'var(--success)':'var(--text-faint)'};font-weight:600">${money(x.amount)}</span></div>`;
     });
   } else {
     s+='<div style="color:var(--text-faint);padding:8px 0">本年暂无收入记录</div>';
@@ -1139,7 +1142,7 @@ function addWishExpense(id){const w=rec('wishes',id);if(!w)return;w.expenses=w.e
 function delWishExpense(id,idx){const w=rec('wishes',id);if(!w||!w.expenses)return;w.expenses.splice(idx,1);upsert('wishes',w);Sync.push('wish',w);openSheet(formSheet('wishes',w))}
 
 /* ====== helpers ====== */
-function spent(p){const pe=(p.expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0);const ie=(p.items||[]).reduce((s,it)=>s+(it.expenses||[]).reduce((se,e)=>se+Number(e.amount||0),0)+(it.amount||0),0);return pe+ie}
+function spent(p){const pe=(p.expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0);const ie=(p.items||[]).reduce((s,it)=>s+(it.expenses||[]).reduce((se,e)=>se+Number(e.amount||0),0)+(it.amount||0),0);const se=(p.stages||[]).reduce((s,stg)=>s+(stg.expenses||[]).reduce((se2,e)=>se2+Number(e.amount||0),0),0);return pe+ie+se}
 function progPct(p){
   if(p.isExec){
     if(!p.completions)return 0;
@@ -1176,6 +1179,9 @@ function delItemExpense(pid,iid,eid){const p=rec('projects',pid);const it=(p.ite
 function addItemExpenseInline(pid,iid){openSheet(`<div class="sh"><h2>记一笔花销</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>金额</label><input type="number" id="ie_amount" placeholder="0" inputmode="decimal"></div><div class="field"><label>名称</label><input type="text" id="ie_note" placeholder="如:购买材料"></div><div class="field"><label>日期</label><input type="date" id="ie_date" value="${fmtISO(new Date())}"></div><div class="btnrow"><button class="btn primary" onclick="saveItemExpenseInline('${pid}','${iid}')">保存</button></div>`)}
 function saveItemExpenseInline(pid,iid){const p=rec('projects',pid);const it=(p.items||[]).find(x=>x.id===iid);if(!it)return;it.expenses=it.expenses||[];it.expenses.push({id:uid(),amount:Number(val('ie_amount')||0),note:val('ie_note'),date:val('ie_date')||fmtISO(new Date())});upsert('projects',p);Sync.push('project',p);closeModal();render()}
 function delItemExpenseInline(pid,iid,eid){const p=rec('projects',pid);const it=(p.items||[]).find(x=>x.id===iid);if(!it)return;it.expenses=(it.expenses||[]).filter(e=>e.id!==eid);upsert('projects',p);Sync.push('project',p);render()}
+function addStageExpense(pid,stgid){openSheet(`<div class="sh"><h2>流程花费</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>金额</label><input type="number" id="se_amount" placeholder="0" inputmode="decimal"></div><div class="field"><label>名称</label><input type="text" id="se_note" placeholder="如:报名费"></div><div class="field"><label>日期</label><input type="date" id="se_date" value="${fmtISO(new Date())}"></div><div class="btnrow"><button class="btn primary" onclick="saveStageExpense('${pid}','${stgid}')">保存</button></div>`)}
+function saveStageExpense(pid,stgid){const p=rec('projects',pid);const stg=(p.stages||[]).find(x=>x.id===stgid);if(!stg)return;stg.expenses=stg.expenses||[];stg.expenses.push({id:uid(),amount:Number(val('se_amount')||0),note:val('se_note'),date:val('se_date')||fmtISO(new Date())});upsert('projects',p);Sync.push('project',p);closeModal();render()}
+function delStageExpense(pid,stgid,eid){const p=rec('projects',pid);const stg=(p.stages||[]).find(x=>x.id===stgid);if(!stg)return;stg.expenses=(stg.expenses||[]).filter(e=>e.id!==eid);upsert('projects',p);Sync.push('project',p);render()}
 function saveItem(pid,iid){const p=rec('projects',pid);p.items=p.items||[];const stgId=p.stages&&p.stages.length?(segVal('i_stage')||'none'):null;if(iid){const it=p.items.find(x=>x.id===iid);if(it){it.title=val('i_title');if(stgId!==null)it.stageId=stgId==='none'?null:stgId}}else p.items.push({id:uid(),title:val('i_title'),done:false,expenses:[],stageId:stgId==='none'?null:stgId});upsert('projects',p);Sync.push('project',p);syncStages(pid);closeModal();render()}
 function delItem(pid,iid){const p=rec('projects',pid);p.items=(p.items||[]).filter(x=>x.id!==iid);upsert('projects',p);Sync.push('project',p);syncStages(pid);render()}
 /* flow stages + SVG flowchart + auto-sync */
@@ -1221,7 +1227,7 @@ if(t==='study'){
     }
     return sheetWrap('Study',`<div class="field"><label>标题</label><input id="f_title" value="${esc(r.title||'')}" placeholder="如:Rust 进阶"></div><div class="field"><label>总周数</label><input type="number" id="f_total" value="${r.totalWeeks||8}" min="1"></div><div class="field"><label>当前周</label><input type="number" id="f_cur" value="${r.currentWeek||0}" min="0"></div><div class="field"><label>备注</label><textarea id="f_note">${esc(r.note||'')}</textarea></div>${saveBtn('saveStudy')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('study','${r.id}');closeModal()">删除</button>`:''));
   }
-  if(t==='money')return sheetWrap('Money',`<div class="field"><label>类型</label>${seg('f_kind',['income|收入','invest|投资'],r.kind||'invest','pickMoneyKind')}</div><div class="field"><label>标题</label><input id="f_title" value="${esc(r.title||'')}" placeholder="${r.kind==='income'?'收入来源':'投资名称'}"></div><div class="field" id="moneyTypeField"><label>分类</label><div id="moneyTypeSeg">${seg('f_type',moneyCats(r.kind),r.type||(r.kind==='income'?'工资':'基金'))}</div></div><div class="field"><label>金额</label><input type="number" id="f_amount" value="${r.amount||''}" inputmode="decimal" placeholder="0"></div><div class="field"><label>日期</label><input type="date" id="f_date" value="${r.date||fmtISO(new Date())}"></div><div class="field" id="moneyReturnField" style="display:${r.kind==='income'?'none':'block'}"><label>已回收金额</label><input type="number" id="f_returned" value="${r.returned||''}" inputmode="decimal" placeholder="0"></div><div class="field"><label>状态</label>${seg('f_stat',['待研究','进行中','已决策'],r.status||'待研究')}</div><div class="field"><label>优先级</label>${seg('f_pri',['高','中','低'],r.priority||'低')}</div><div class="field"><label>笔记</label><textarea id="f_note">${esc(r.note||'')}</textarea></div>${saveBtn('saveMoney')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('money','${r.id}');closeModal()">删除</button>`:''));
+  if(t==='money')return sheetWrap('Money',`<div class="field"><label>类型</label>${seg('f_kind',['income|收入','invest|投资'],r.kind||'invest','pickMoneyKind')}</div><div class="field"><label>标题</label><input id="f_title" value="${esc(r.title||'')}" placeholder="${r.kind==='income'?'收入来源':'投资名称'}"></div><div class="field" id="moneyTypeField"><label>分类</label><div id="moneyTypeSeg">${seg('f_type',moneyCats(r.kind),r.type||(r.kind==='income'?'工资':'基金'))}</div></div><div class="field"><label>金额</label><input type="number" id="f_amount" value="${r.amount||''}" inputmode="decimal" placeholder="0"></div><div class="field"><label>日期</label><input type="date" id="f_date" value="${r.date||fmtISO(new Date())}"></div><div class="field" id="moneyReturnField" style="display:${r.kind==='income'?'none':'block'}"><label>已回收金额</label><input type="number" id="f_returned" value="${r.returned||''}" inputmode="decimal" placeholder="0"></div><div class="field"><label>状态</label><div id="moneyStatSeg">${seg('f_stat',moneyStats(r.kind),r.status||(r.kind==='income'?'已入账':'待研究'))}</div><div class="field"><label>优先级</label>${seg('f_pri',['高','中','低'],r.priority||'低')}</div><div class="field"><label>笔记</label><textarea id="f_note">${esc(r.note||'')}</textarea></div>${saveBtn('saveMoney')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('money','${r.id}');closeModal()">删除</button>`:''));
   if(t==='notes')return sheetWrap('Idea',`<div class="field"><label>标题</label><input id="f_title" value="${esc(r.title||'')}" placeholder="可选标题"></div><div class="field"><label>内容</label><textarea id="f_content" style="min-height:120px" placeholder="灵感、思考、任何想记的...">${esc(r.content||'')}</textarea></div><div class="field"><label>标签</label><input id="f_tags" value="${esc(r.tags||'')}" placeholder="逗号分隔"></div>${saveBtn('saveNote')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('notes','${r.id}');closeModal()">删除</button>`:''));
   if(t==='wishes')return sheetWrap('Wish',`<div class="field"><label>想做什么</label><input id="f_title" value="${esc(r.title||'')}" placeholder="如:学陶艺、跳伞、去冰岛..."></div><div class="field"><label>分类</label>${seg('f_wcat',['体验','技能','旅行','收藏','其他'],r.category||'体验')}</div><div class="field"><label>优先级</label>${seg('f_wpri',['dream|梦想','plan|计划中','soon|近期'],r.priority||'dream')}</div><div class="field"><label>预算</label><div style="display:flex;align-items:center;gap:8px"><span style="color:var(--text-muted);font-size:14px">¥</span><input id="f_budget" type="number" inputmode="decimal" min="0" step="0.01" value="${r.budget||''}" placeholder="预计花费" style="flex:1"></div></div><div class="field"><label>备注</label><textarea id="f_note" placeholder="为什么想做?有什么期待?">${esc(r.note||'')}</textarea></div><div class="field"><label>日期</label><input type="date" id="f_date" value="${r.date||fmtISO(new Date())}"></div>${r.id?wishExpenseSection(r):''}${saveBtn('saveWish')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('wishes','${r.id}');closeModal()">删除</button>`:''));
   return sheetWrap('Edit','<div class="empty"><p>未知类型</p></div>');
@@ -1237,7 +1243,8 @@ function saveProj(){const r=Object.assign(rec('projects',editId)||{expenses:[],i
 function saveStudy(){const r={id:editId||uid(),title:val('f_title'),totalWeeks:Number(val('f_total')||1),currentWeek:Number(val('f_cur')||0),note:val('f_note')};upsert('study',r);Sync.push('study',r);closeModal();render()}
 function saveMoney(){const r={id:editId||uid(),kind:segVal('f_kind')||'invest',title:val('f_title'),type:segVal('f_type'),amount:Number(val('f_amount')||0),returned:Number(val('f_returned')||0),status:segVal('f_stat'),priority:segVal('f_pri'),note:val('f_note'),date:val('f_date')||fmtISO(new Date())};upsert('money',r);Sync.push('money',r);closeModal();render()}
 function moneyCats(kind){return kind==='income'?['工资','兼职','奖金','投资收益','其他']:['基金','股票','储蓄','债券','理财','其他']}
-function pickMoneyKind(btn,v){pickSeg(btn,v);const rf=document.getElementById('moneyReturnField');if(rf)rf.style.display=v==='income'?'none':'block';const ti=document.getElementById('f_title');if(ti&&(!ti.value||ti.value==='投资名称'||ti.value==='收入来源'))ti.placeholder=v==='income'?'收入来源':'投资名称';const ts=document.getElementById('moneyTypeSeg');if(ts){ts.innerHTML=seg('f_type',moneyCats(v),v==='income'?'工资':'基金')}}
+function moneyStats(kind){return kind==='income'?['已入账','未入账']:['待研究','进行中','已决策']}
+function pickMoneyKind(btn,v){pickSeg(btn,v);const rf=document.getElementById('moneyReturnField');if(rf)rf.style.display=v==='income'?'none':'block';const ti=document.getElementById('f_title');if(ti&&(!ti.value||ti.value==='投资名称'||ti.value==='收入来源'))ti.placeholder=v==='income'?'收入来源':'投资名称';const ts=document.getElementById('moneyTypeSeg');if(ts){ts.innerHTML=seg('f_type',moneyCats(v),v==='income'?'工资':'基金')}const ss=document.getElementById('moneyStatSeg');if(ss){ss.innerHTML=seg('f_stat',moneyStats(v),v==='income'?'已入账':'待研究')}}
 function pickBudgetMode(btn,v){pickSeg(btn,v);const bf=document.getElementById('budgetField');if(bf)bf.style.display=v==='budget'?'block':'none'}
 function saveNote(){const r={id:editId||uid(),title:val('f_title'),content:val('f_content'),tags:val('f_tags')};upsert('notes',r);Sync.push('note',r);closeModal();render()}
 function val(id){return(document.getElementById(id)?.value||'').trim()}
