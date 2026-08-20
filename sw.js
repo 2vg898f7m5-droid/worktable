@@ -1,4 +1,4 @@
-const CACHE = 'worktable-v12';
+const CACHE = 'worktable-v13';
 const SHELL = [
   './',
   './index.html',
@@ -7,10 +7,9 @@ const SHELL = [
   './icon-512.png',
   './idea-bg-final.jpg'
 ];
-const SUPA_LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
 const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-const EXTERNAL_LIBS = [SUPA_LIB, LEAFLET_CSS, LEAFLET_JS];
+const EXTERNAL_LIBS = [LEAFLET_CSS, LEAFLET_JS];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -77,6 +76,6 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Supabase API: network only
-  if (url.hostname.includes('supabase')) return;
+  // GitHub API: network only
+  if (url.hostname.includes('api.github.com')) return;
 });
