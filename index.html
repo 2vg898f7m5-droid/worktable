@@ -782,11 +782,20 @@ function viewStudy(){
       children.forEach(c=>{
         const cpct=progPct(c),cExec=st.filter(e=>e.parentId===c.id);
         const cMs=c.milestones||[];
-        const msDone=cMs.filter(m=>m.done).length;
+        const msDone=cMs.filter(m=>(m.target!=null&&m.target>0)?(m.current||0)>=m.target:m.done).length;
         const msBadge=cMs.length?`<span class="pill muted">🎯 ${msDone}/${cMs.length}</span>`:'';
-        s+=`<div class="itemrow ${cpct>=100?'done':''}" onclick="event.stopPropagation();editRec('study','${c.id}')"><div class="ichk" style="${cpct>=100?'background:var(--accent);border-color:var(--accent)':''}">${IC.chek}</div><div class="iname">${esc(c.title)}</div>${msBadge}${cExec.length?`<span class="pill muted">${cExec.length} 执行</span>`:''}<button class="pill soft" style="font-size:10px" onclick="event.stopPropagation();addSubPlan('${c.id}')">+ 执行</button><span class="pct">${cpct}%</span></div>`;
+        const cTargetBadge=(c.target!=null&&c.target>0)?`<span class="pill muted">${c.current||0}/${c.target}${esc(c.unit||'')}</span>`:'';
+        s+=`<div class="itemrow ${cpct>=100?'done':''}" onclick="event.stopPropagation();editRec('study','${c.id}')"><div class="ichk" style="${cpct>=100?'background:var(--accent);border-color:var(--accent)':''}">${IC.chek}</div><div class="iname">${esc(c.title)}</div>${cTargetBadge}${msBadge}${cExec.length?`<span class="pill muted">${cExec.length} 执行</span>`:''}<button class="pill soft" style="font-size:10px" onclick="event.stopPropagation();addSubPlan('${c.id}')">+ 执行</button><span class="pct">${cpct}%</span></div>`;
         cMs.forEach(m=>{
-          s+=`<div class="ms-row ${m.done?'done':''}" style="margin-left:24px" onclick="event.stopPropagation();editRec('study','${c.id}')"><div class="ms-chk" style="${m.done?'background:var(--accent);border-color:var(--accent)':''}">${IC.chek}</div><span class="ms-date">${m.date?fmtDate(m.date):'无日期'}</span><span class="ms-title">${esc(m.title)}</span></div>`;
+          const mHasT=m.target!=null&&m.target>0;
+          const mCur=m.current||0;
+          const mPct=mHasT?Math.min(100,Math.round(mCur/m.target*100)):0;
+          const mDone=mHasT?mCur>=m.target:m.done;
+          if(mHasT){
+            s+=`<div class="ms-row ${mDone?'done':''}" style="margin-left:24px" onclick="event.stopPropagation();editRec('study','${c.id}')"><span class="ms-date">${m.date?fmtDate(m.date):'无日期'}</span><span class="ms-title">${esc(m.title)}</span><div style="margin-left:auto;display:flex;align-items:center;gap:4px;flex:none"><div class="pbar" style="width:40px;height:4px;border-radius:2px;background:var(--surface-3);overflow:hidden"><i style="width:${mPct}%;height:100%;background:${mDone?'var(--success)':'var(--accent)'};display:block"></i></div><span style="font-size:11px;color:var(--text-muted);white-space:nowrap">${mCur}/${m.target}${esc(m.unit||'')}</span></div></div>`;
+          } else {
+            s+=`<div class="ms-row ${mDone?'done':''}" style="margin-left:24px" onclick="event.stopPropagation();editRec('study','${c.id}')"><div class="ms-chk" style="${mDone?'background:var(--accent);border-color:var(--accent)':''}">${IC.chek}</div><span class="ms-date">${m.date?fmtDate(m.date):'无日期'}</span><span class="ms-title">${esc(m.title)}</span></div>`;
+          }
         });
         cExec.forEach(e=>{
           const epct=progPct(e);
@@ -1270,7 +1279,8 @@ function progPct(p){
   }
   const children=load('study').filter(c=>c.parentId===p.id);
   if(children.length)return Math.round(children.reduce((s,c)=>s+progPct(c),0)/children.length);
-  if(p.milestones&&p.milestones.length){const d=p.milestones.filter(m=>m.done).length;return Math.round(d/p.milestones.length*100)}
+  if(p.target!=null&&p.target>0)return Math.min(100,Math.round(((p.current||0)/p.target)*100));
+  if(p.milestones&&p.milestones.length){const tp=p.milestones.reduce((s,m)=>{if(m.target!=null&&m.target>0)return s+Math.min(1,(m.current||0)/m.target);return s+(m.done?1:0)},0);return Math.round(tp/p.milestones.length*100)}
   if(p.totalWeeks!=null)return Math.min(100,Math.round(((p.currentWeek||0)/(p.totalWeeks||1))*100));
   if(p.items&&p.items.length){const d=p.items.filter(i=>i.done).length;return Math.round(d/p.items.length*100)}
   if(p.progress!=null)return Math.max(0,Math.min(100,Math.round(p.progress)));
@@ -1316,8 +1326,8 @@ function handleFileUpload(pid,stgId,file){if(!file)return;if(file.size>3*1024*10
 function viewAttachment(pid,aid){const p=rec('projects',pid);const f=(p.attachments||[]).find(x=>x.id===aid);if(!f)return;if(f.type==='image'){openSheet(`<div class="sh"><h2>${esc(f.name)}</h2><button onclick="closeModal()">${IC.back}</button></div><img src="${f.data}" style="width:100%;border-radius:var(--rc);margin-bottom:var(--s3)"><div class="btnrow"><a class="btn ghost" href="${f.data}" download="${esc(f.name)}" style="text-decoration:none;display:inline-block">下载</a><button class="btn danger" onclick="delAttachment('${pid}','${f.id}');closeModal()">删除</button></div>`)}else{openSheet(`<div class="sh"><h2>${esc(f.name)}</h2><button onclick="closeModal()">${IC.back}</button></div><div style="text-align:center;padding:var(--s4)">${IC.file}<div style="margin-top:var(--s2);color:var(--text-muted);font-size:13px">${(f.size/1024).toFixed(1)} KB · ${esc(f.mime||'文件')}</div></div><div class="btnrow"><a class="btn ghost" href="${f.data}" download="${esc(f.name)}" style="text-decoration:none;display:inline-block">下载</a><button class="btn danger" onclick="delAttachment('${pid}','${f.id}');closeModal()">删除</button></div>`)}}
 function delAttachment(pid,aid){const p=rec('projects',pid);p.attachments=(p.attachments||[]).filter(x=>x.id!==aid);upsert('projects',p);Sync.push('project',p);render()}
 function addSubPlan(parentId){editId=null;const parent=rec('study',parentId);const isMidParent=parent&&(parent.parentId||parent.isExec);const defType=isMidParent?'exec':'mid';openSheet(`<div class="sh"><h2>${defType==='exec'?'执行计划':'子计划'}</h2><button onclick="closeModal()">${IC.back}</button></div><div class="field"><label>标题</label><input id="f_title" placeholder="${defType==='exec'?'如:背单词':'如:雅思听力'}"></div><div class="field"><label>类型</label>${seg('f_type',['mid|中级计划','exec|执行计划'],defType,'pickPlanType')}</div><div class="field" id="milestoneField" style="display:${defType==='mid'?'block':'none'}"><label>阶段性目标 <span style="color:var(--text-faint);font-weight:400">（达成进度）</span></label><div style="font-size:12px;color:var(--text-faint);padding:8px 0">保存后可添加阶段性目标</div></div><div class="field" id="dailyField" style="display:${defType==='exec'?'block':'none'}"><label>每日目标 <span style="color:var(--text-faint);font-weight:400">（可选）</span></label><input id="f_daily" type="number" placeholder="如:50"></div><div class="field" id="scheduleField" style="display:${defType==='exec'?'block':'none'}"><label>执行频率</label>${seg('f_sched',['daily|每天','every2|隔天','every3|每3天','weekly|每周','custom|自定义'],'daily','pickSchedule')}<div id="customSchedField" style="display:none;margin-top:6px"><input id="f_sched_n" type="number" value="2" min="1" style="width:60px;text-align:center;border:1px solid var(--border);border-radius:var(--r);padding:4px 8px"> <span style="color:var(--text-muted);font-size:13px">天一次</span></div></div><div class="field" id="startDateField" style="display:${defType==='exec'?'block':'none'}"><label>开始日期</label><input type="date" id="f_sdate" value="${fmtISO(new Date())}"></div><div class="field"><label>备注</label><textarea id="f_note"></textarea></div><div class="btnrow"><button class="btn primary" onclick="saveSubPlan('${parentId}')">保存</button></div>`)}
-function saveSubPlan(parentId){const type=segVal('f_type'),r={id:uid(),title:val('f_title'),parentId,dailyGoal:Number(val('f_daily')||0),note:val('f_note'),isExec:type==='exec'};if(type!=='exec'){r.milestones=[]}if(type==='exec'){r.completions={};r.startDate=val('f_sdate')||fmtISO(new Date());const sv=segVal('f_sched')||'daily';if(sv==='daily')r.schedule={type:'daily'};else if(sv==='every2')r.schedule={type:'everyNdays',n:2};else if(sv==='every3')r.schedule={type:'everyNdays',n:3};else if(sv==='weekly')r.schedule={type:'weekly'};else r.schedule={type:'everyNdays',n:Number(val('f_sched_n')||2)}}upsert('study',r);Sync.push('study',r);closeModal();render()}
-function saveSubPlanEdit(){const type=segVal('f_type'),ex=rec('study',editId);if(!ex)return;ex.title=val('f_title');ex.note=val('f_note');ex.isExec=type==='exec';if(type==='exec'){ex.dailyGoal=Number(val('f_daily')||0);if(!ex.completions)ex.completions={};ex.startDate=val('f_sdate')||fmtISO(new Date());const sv=segVal('f_sched')||'daily';if(sv==='daily')ex.schedule={type:'daily'};else if(sv==='every2')ex.schedule={type:'everyNdays',n:2};else if(sv==='every3')ex.schedule={type:'everyNdays',n:3};else if(sv==='weekly')ex.schedule={type:'weekly'};else ex.schedule={type:'everyNdays',n:Number(val('f_sched_n')||2)}}if(!ex.milestones&&type!=='exec')ex.milestones=[];upsert('study',ex);Sync.push('study',ex);closeModal();render()}
+function saveSubPlan(parentId){const type=segVal('f_type'),r={id:uid(),title:val('f_title'),parentId,dailyGoal:Number(val('f_daily')||0),note:val('f_note'),isExec:type==='exec'};if(type!=='exec'){r.milestones=[];const tg=val('f_target');if(tg&&Number(tg)>0){r.target=Number(tg);r.unit=val('f_unit')||'';r.current=Number(val('f_current')||0)}}if(type==='exec'){r.completions={};r.startDate=val('f_sdate')||fmtISO(new Date());const sv=segVal('f_sched')||'daily';if(sv==='daily')r.schedule={type:'daily'};else if(sv==='every2')r.schedule={type:'everyNdays',n:2};else if(sv==='every3')r.schedule={type:'everyNdays',n:3};else if(sv==='weekly')r.schedule={type:'weekly'};else r.schedule={type:'everyNdays',n:Number(val('f_sched_n')||2)}}upsert('study',r);Sync.push('study',r);closeModal();render()}
+function saveSubPlanEdit(){const type=segVal('f_type'),ex=rec('study',editId);if(!ex)return;ex.title=val('f_title');ex.note=val('f_note');ex.isExec=type==='exec';if(type==='exec'){ex.dailyGoal=Number(val('f_daily')||0);if(!ex.completions)ex.completions={};ex.startDate=val('f_sdate')||fmtISO(new Date());const sv=segVal('f_sched')||'daily';if(sv==='daily')ex.schedule={type:'daily'};else if(sv==='every2')ex.schedule={type:'everyNdays',n:2};else if(sv==='every3')ex.schedule={type:'everyNdays',n:3};else if(sv==='weekly')ex.schedule={type:'weekly'};else ex.schedule={type:'everyNdays',n:Number(val('f_sched_n')||2)}}else{if(!ex.milestones)ex.milestones=[];const tg=val('f_target');if(tg&&Number(tg)>0){ex.target=Number(tg);ex.unit=val('f_unit')||'';ex.current=Number(val('f_current')||0)}else{delete ex.target;delete ex.unit;delete ex.current}}upsert('study',ex);Sync.push('study',ex);closeModal();render()}
 function getExecTodosForDate(dateStr){
   const study=load('study');
   return study.filter(p=>p.isExec).filter(p=>{
@@ -1362,9 +1372,9 @@ function smartParseStudy(){
   const startDate=val('f_sdate')||fmtISO(new Date());
   const tw=val('f_total');
   let bigPlanId=editId;
-  if(!bigPlanId){bigPlanId=uid();const r={id:bigPlanId,title,startDate,totalWeeks:tw?Number(tw):null,currentWeek:Number(val('f_cur')||0),note};upsert('study',r);Sync.push('study',r);editId=bigPlanId}
+  if(!bigPlanId){bigPlanId=uid();const r={id:bigPlanId,title,startDate,totalWeeks:tw?Number(tw):null,currentWeek:Number(val('f_cur')||0),note};const btg=val('f_target');if(btg&&Number(btg)>0){r.target=Number(btg);r.unit=val('f_unit')||'';r.current=Number(val('f_current')||0)}upsert('study',r);Sync.push('study',r);editId=bigPlanId}
   const numMap={'一':1,'两':2,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
-  let midTitles=[],execSpecs=[];
+  let midTitles=[],midTargets={},execSpecs=[];
   note.split(/[\n。；;]/).map(l=>l.trim()).filter(l=>l).forEach(line=>{
     let m;
     if(m=line.match(/^每天(.+)/)){
@@ -1382,14 +1392,27 @@ function smartParseStudy(){
     if(m=line.match(/^每周(.+)/)){
       execSpecs.push({title:m[1].trim(),dailyGoal:0,schedule:{type:'weekly'},raw:line});return;
     }
-    line.split(/[\s,，、]+/).map(s=>s.trim()).filter(s=>s.length>=2).forEach(item=>{if(!midTitles.includes(item))midTitles.push(item)});
+    const items=line.split(/[\s,，、]+/).map(s=>s.trim()).filter(s=>s.length>=1);
+    let lastSubject=null;
+    items.forEach(item=>{
+      const inlineM=item.match(/^(.+?)(\d+(?:\.\d+)?)\s*(分|个|篇|次|小时|分钟|天|本|套|道|词)?$/);
+      if(inlineM&&inlineM[1].length>=2){
+        const subj=inlineM[1],target=Number(inlineM[2]),unit=inlineM[3]||'';
+        if(!midTitles.includes(subj))midTitles.push(subj);
+        midTargets[subj]={target,unit};lastSubject=subj;return
+      }
+      const tm=item.match(/^(\d+(?:\.\d+)?)\s*(分|个|篇|次|小时|分钟|天|本|套|道|词)?$/);
+      if(tm&&lastSubject){midTargets[lastSubject]={target:Number(tm[1]),unit:tm[2]||''};return}
+      if(item.length>=2){if(!midTitles.includes(item))midTitles.push(item);lastSubject=item}
+    });
   });
   const study=load('study');
   let midMap={};
   midTitles.forEach(t=>{
     const ex=study.find(p=>p.parentId===bigPlanId&&p.title===t&&!p.isExec);
-    if(ex)midMap[t]=ex.id;
-    else{const midId=uid();upsert('study',{id:midId,parentId:bigPlanId,title:t,milestones:[],isExec:false});midMap[t]=midId}
+    const mt=midTargets[t];
+    if(ex){midMap[t]=ex.id;if(mt&&!ex.target){ex.target=mt.target;ex.unit=mt.unit;ex.current=ex.current||0;upsert('study',ex)}}
+    else{const midId=uid();const mid={id:midId,parentId:bigPlanId,title:t,milestones:[],isExec:false};if(mt){mid.target=mt.target;mid.unit=mt.unit;mid.current=0}upsert('study',mid);midMap[t]=midId}
   });
   let created=0;
   execSpecs.forEach(spec=>{
@@ -1404,9 +1427,12 @@ function smartParseStudy(){
     const ex=study.find(p=>p.parentId===pId&&p.title===cleanTitle&&p.isExec);
     if(!ex){const eid=uid();upsert('study',{id:eid,parentId:pId,title:cleanTitle,dailyGoal:spec.dailyGoal,isExec:true,completions:{},schedule:spec.schedule,startDate});created++}
   });
-  let msg=`已创建 ${midTitles.length} 个中级计划（里程碑模式）`;
+  let msg=`已创建 ${midTitles.length} 个中级计划`;
+  const tCount=Object.keys(midTargets).length;
+  if(tCount)msg+=`（其中 ${tCount} 个已自动设目标值）`;
   if(execSpecs.length)msg+=`，${execSpecs.length} 个执行计划`;
-  msg+=`\n中级计划可通过阶段性目标追踪进度，执行计划将自动出现在日历和待办清单上。`;
+  msg+=`\n中级计划：点开→设目标值→进度条自动计算，不设目标→勾选达成`;
+  msg+=`\n执行计划将自动出现在日历和待办清单上。`;
   alert(msg);
   closeModal();render();
 }
@@ -1424,9 +1450,9 @@ if(t==='study'){
       const isExec=r.isExec;
       const sch=r.schedule||{};
       const msHTML=!isExec?milestoneSectionHTML(r):'';
-      return sheetWrap(isExec?'执行计划':'子计划',`<div class="field"><label>标题</label><input id="f_title" value="${esc(r.title||'')}"></div><div class="field"><label>类型</label>${seg('f_type',['mid|中级计划','exec|执行计划'],isExec?'exec':'mid','pickPlanType')}</div><div class="field" id="milestoneField" style="display:${isExec?'none':'block'}"><label>阶段性目标 <span style="color:var(--text-faint);font-weight:400">（达成进度）</span></label>${msHTML}</div><div class="field" id="dailyField" style="display:${isExec?'block':'none'}"><label>每日目标 <span style="color:var(--text-faint);font-weight:400">（可选）</span></label><input id="f_daily" type="number" value="${r.dailyGoal||''}" placeholder="如:50"></div><div class="field" id="scheduleField" style="display:${isExec?'block':'none'}"><label>执行频率</label>${seg('f_sched',['daily|每天','every2|隔天','every3|每3天','weekly|每周','custom|自定义'],sch.type==='everyNdays'?(sch.n===2?'every2':sch.n===3?'every3':'custom'):sch.type||'daily','pickSchedule')}<div id="customSchedField" style="display:${(sch.type==='everyNdays'&&sch.n!==2&&sch.n!==3)||sch.type==='custom'?'block':'none'};margin-top:6px"><input id="f_sched_n" type="number" value="${sch.n||2}" min="1" style="width:60px;text-align:center;border:1px solid var(--border);border-radius:var(--r);padding:4px 8px"> <span style="color:var(--text-muted);font-size:13px">天一次</span></div></div><div class="field" id="startDateField" style="display:${isExec?'block':'none'}"><label>开始日期</label><input type="date" id="f_sdate" value="${r.startDate||fmtISO(new Date())}"></div><div class="field"><label>备注</label><textarea id="f_note">${esc(r.note||'')}</textarea></div>${saveBtn('saveSubPlanEdit')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('study','${r.id}');closeModal()">删除</button>`:''));
+      return sheetWrap(isExec?'执行计划':'子计划',`<div class="field"><label>标题</label><input id="f_title" value="${esc(r.title||'')}"></div><div class="field"><label>类型</label>${seg('f_type',['mid|中级计划','exec|执行计划'],isExec?'exec':'mid','pickPlanType')}</div><div class="field" id="midTargetField" style="display:${isExec?'none':'block'}"><label>科目目标 <span style="color:var(--text-faint);font-weight:400">（可选，精准计算进度）</span></label><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="number" id="f_target" value="${r.target||''}" step="0.5" placeholder="如:7" style="width:70px;border:1px solid var(--border);border-radius:var(--r);padding:5px 8px"><input type="text" id="f_unit" value="${r.unit||''}" placeholder="单位" style="width:50px;border:1px solid var(--border);border-radius:var(--r);padding:5px 8px"><span style="color:var(--text-muted);font-size:12px">当前</span><input type="number" id="f_current" value="${r.current||0}" step="0.5" style="width:55px;border:1px solid var(--border);border-radius:var(--r);padding:5px 8px"></div></div><div class="field" id="milestoneField" style="display:${isExec?'none':'block'}"><label>阶段性目标 <span style="color:var(--text-faint);font-weight:400">（达成进度）</span></label>${msHTML}</div><div class="field" id="dailyField" style="display:${isExec?'block':'none'}"><label>每日目标 <span style="color:var(--text-faint);font-weight:400">（可选）</span></label><input id="f_daily" type="number" value="${r.dailyGoal||''}" placeholder="如:50"></div><div class="field" id="scheduleField" style="display:${isExec?'block':'none'}"><label>执行频率</label>${seg('f_sched',['daily|每天','every2|隔天','every3|每3天','weekly|每周','custom|自定义'],sch.type==='everyNdays'?(sch.n===2?'every2':sch.n===3?'every3':'custom'):sch.type||'daily','pickSchedule')}<div id="customSchedField" style="display:${(sch.type==='everyNdays'&&sch.n!==2&&sch.n!==3)||sch.type==='custom'?'block':'none'};margin-top:6px"><input id="f_sched_n" type="number" value="${sch.n||2}" min="1" style="width:60px;text-align:center;border:1px solid var(--border);border-radius:var(--r);padding:4px 8px"> <span style="color:var(--text-muted);font-size:13px">天一次</span></div></div><div class="field" id="startDateField" style="display:${isExec?'block':'none'}"><label>开始日期</label><input type="date" id="f_sdate" value="${r.startDate||fmtISO(new Date())}"></div><div class="field"><label>备注</label><textarea id="f_note">${esc(r.note||'')}</textarea></div>${saveBtn('saveSubPlanEdit')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('study','${r.id}');closeModal()">删除</button>`:''));
     }
-    return sheetWrap('Study',`<div class="field"><label>标题</label><input id="f_title" value="${esc(r.title||'')}" placeholder="如:雅思学习"></div><div class="field"><label>开始日期</label><input type="date" id="f_sdate" value="${r.startDate||fmtISO(new Date())}"></div><div class="field"><label>总周数 <span style="color:var(--text-faint);font-weight:400">（可选，不填=未知）</span></label><input type="number" id="f_total" value="${r.totalWeeks||''}" min="1" placeholder="留空=未知"></div><div class="field"><label>当前周</label><input type="number" id="f_cur" value="${r.currentWeek||0}" min="0"></div><div class="field"><label>备注 <span style="color:var(--text-faint);font-weight:400">（写描述可智能拆分）</span></label><textarea id="f_note" placeholder="如：雅思听力 雅思阅读 雅思写作 雅思口语&#10;每天背30个单词&#10;每隔两天进行一篇雅思写作&#10;每隔一天完成一篇雅思听力">${esc(r.note||'')}</textarea></div><div class="btnrow"><button class="btn ghost" onclick="smartParseStudy()" style="width:100%">智能拆分备注</button></div>${saveBtn('saveStudy')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('study','${r.id}');closeModal()">删除</button>`:''));
+    return sheetWrap('Study',`<div class="field"><label>标题</label><input id="f_title" value="${esc(r.title||'')}" placeholder="如:雅思学习"></div><div class="field"><label>总目标 <span style="color:var(--text-faint);font-weight:400">（可选，自动精准计算进度）</span></label><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="number" id="f_target" value="${r.target||''}" step="0.5" placeholder="如:7" style="width:70px;border:1px solid var(--border);border-radius:var(--r);padding:5px 8px"><input type="text" id="f_unit" value="${r.unit||''}" placeholder="单位" style="width:50px;border:1px solid var(--border);border-radius:var(--r);padding:5px 8px"><span style="color:var(--text-muted);font-size:12px">当前</span><input type="number" id="f_current" value="${r.current||0}" step="0.5" style="width:55px;border:1px solid var(--border);border-radius:var(--r);padding:5px 8px"></div></div><div class="field"><label>开始日期</label><input type="date" id="f_sdate" value="${r.startDate||fmtISO(new Date())}"></div><div class="field"><label>总周数 <span style="color:var(--text-faint);font-weight:400">（可选，不填=未知）</span></label><input type="number" id="f_total" value="${r.totalWeeks||''}" min="1" placeholder="留空=未知"></div><div class="field"><label>当前周</label><input type="number" id="f_cur" value="${r.currentWeek||0}" min="0"></div><div class="field"><label>备注 <span style="color:var(--text-faint);font-weight:400">（写描述可智能拆分）</span></label><textarea id="f_note" placeholder="如：雅思听力7分 雅思阅读7分 雅思写作6.5分&#10;每天背30个单词&#10;每隔两天进行一篇雅思写作&#10;每隔一天完成一篇雅思听力">${esc(r.note||'')}</textarea></div><div class="btnrow"><button class="btn ghost" onclick="smartParseStudy()" style="width:100%">智能拆分备注</button></div>${saveBtn('saveStudy')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('study','${r.id}');closeModal()">删除</button>`:''));
   }
   if(t==='money')return sheetWrap('Money',`<div class="field"><label>类型</label>${seg('f_kind',['income|收入','invest|投资'],r.kind||'invest','pickMoneyKind')}</div><div class="field"><label>标题</label><input id="f_title" value="${esc(r.title||'')}" placeholder="${r.kind==='income'?'收入来源':'投资名称'}"></div><div class="field" id="moneyTypeField"><label>分类</label><div id="moneyTypeSeg">${seg('f_type',moneyCats(r.kind),r.type||(r.kind==='income'?'工资':'基金'))}</div></div><div class="field"><label>金额</label><input type="number" id="f_amount" value="${r.amount||''}" inputmode="decimal" placeholder="0"></div><div class="field"><label>日期</label><input type="date" id="f_date" value="${r.date||fmtISO(new Date())}"></div><div class="field" id="moneyReturnField" style="display:${r.kind==='income'?'none':'block'}"><label>已回收金额</label><input type="number" id="f_returned" value="${r.returned||''}" inputmode="decimal" placeholder="0"></div><div class="field"><label>状态</label><div id="moneyStatSeg">${seg('f_stat',moneyStats(r.kind),r.status||(r.kind==='income'?'已入账':'待研究'))}</div><div class="field"><label>优先级</label>${seg('f_pri',['高','中','低'],r.priority||'低')}</div><div class="field"><label>笔记</label><textarea id="f_note">${esc(r.note||'')}</textarea></div>${saveBtn('saveMoney')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('money','${r.id}');closeModal()">删除</button>`:''));
   if(t==='notes')return sheetWrap('Idea',`<div class="field"><label>标题</label><input id="f_title" value="${esc(r.title||'')}" placeholder="可选标题"></div><div class="field"><label>内容</label><textarea id="f_content" style="min-height:120px" placeholder="灵感、思考、任何想记的...">${esc(r.content||'')}</textarea></div><div class="field"><label>标签</label><input id="f_tags" value="${esc(r.tags||'')}" placeholder="逗号分隔"></div>${saveBtn('saveNote')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('notes','${r.id}');closeModal()">删除</button>`:''));
@@ -1438,52 +1464,66 @@ function sheetWrap(title,body){return`<div class="sh"><h2>${title}</h2><button o
 function saveBtn(fn){return`<div class="btnrow"><button class="btn primary" onclick="${fn}()">保存</button><button class="btn ghost" onclick="closeModal()">取消</button></div>`}
 function seg(id,opts,sel,handler){const fn=handler||'pickSeg';return`<div class="seg" id="${id}">${opts.map(o=>{const[oval,olab]=(o+'').split('|');return`<button onclick="${fn}(this,'${oval}')" data-v="${oval}" class="${oval===sel?'sel':''}">${olab||oval}</button>`}).join('')}</div>`}
 function pickSeg(btn,v){btn.parentNode.querySelectorAll('button').forEach(b=>{b.classList.toggle('sel',b.dataset.v===v)})}
-function pickPlanType(btn,v){pickSeg(btn,v);const d=document.getElementById('dailyField');if(d)d.style.display=v==='exec'?'block':'none';const mf=document.getElementById('milestoneField');if(mf)mf.style.display=v==='mid'?'block':'none';const sf=document.getElementById('scheduleField');if(sf)sf.style.display=v==='exec'?'block':'none';const sd=document.getElementById('startDateField');if(sd)sd.style.display=v==='exec'?'block':'none'}
+function pickPlanType(btn,v){pickSeg(btn,v);const d=document.getElementById('dailyField');if(d)d.style.display=v==='exec'?'block':'none';const mf=document.getElementById('milestoneField');if(mf)mf.style.display=v==='mid'?'block':'none';const tf=document.getElementById('midTargetField');if(tf)tf.style.display=v==='mid'?'block':'none';const sf=document.getElementById('scheduleField');if(sf)sf.style.display=v==='exec'?'block':'none';const sd=document.getElementById('startDateField');if(sd)sd.style.display=v==='exec'?'block':'none'}
 function pickSchedule(btn,v){pickSeg(btn,v);const cf=document.getElementById('customSchedField');if(cf)cf.style.display=(v==='custom')?'block':'none'}
 function milestoneSectionHTML(r){
   if(!r.id)return '<div style="font-size:12px;color:var(--text-faint);padding:8px 0">保存后可添加阶段性目标</div>';
   const ms=r.milestones||[];
-  let html='<div class="ms-list" id="msList">';
-  if(ms.length){
-    ms.forEach(m=>{
-      html+=`<div class="ms-row ${m.done?'done':''}"><div class="ms-chk" onclick="toggleMilestoneInline('${m.id}')">${IC.chek}</div><span class="ms-date">${m.date?fmtDate(m.date):'无日期'}</span><span class="ms-title">${esc(m.title)}</span><span class="ms-del" onclick="delMilestoneInline('${m.id}')">删除</span></div>`;
-    });
-  } else {
-    html+='<div style="font-size:12px;color:var(--text-faint);padding:6px 0">暂无目标，添加一个吧</div>';
-  }
-  html+='</div>';
-  html+=`<div class="ms-inline-add"><input type="date" id="ms_date" value="${fmtISO(new Date())}"><input type="text" id="ms_title" placeholder="如:雅思听力稳定7分" style="flex:1"><button class="btn ghost" style="padding:5px 12px;font-size:12px" onclick="addMilestoneInline()">+ 添加</button></div>`;
+  let html='<div class="ms-list" id="msList">'+milestoneRowsHTML(ms)+'</div>';
+  html+=`<div style="font-size:11px;color:var(--text-faint);padding:4px 0 6px">填目标值=进度条自动计算，不填=勾选达成</div>`;
+  html+=`<div class="ms-inline-add"><input type="date" id="ms_date" value="${fmtISO(new Date())}"><input type="text" id="ms_title" placeholder="如:雅思听力稳定7分" style="flex:1;min-width:80px"><input type="number" id="ms_target" placeholder="目标" style="width:55px" step="0.5"><input type="text" id="ms_unit" placeholder="单位" style="width:38px"><button class="btn ghost" style="padding:5px 10px;font-size:12px" onclick="addMilestoneInline()">+ 添加</button></div>`;
   return html;
+}
+function milestoneRowsHTML(ms){
+  if(!ms.length)return '<div style="font-size:12px;color:var(--text-faint);padding:6px 0">暂无目标，添加一个吧</div>';
+  return ms.map(m=>{
+    const hasTarget=m.target!=null&&m.target>0;
+    const cur=m.current||0;
+    const pct=hasTarget?Math.min(100,Math.round(cur/m.target*100)):0;
+    const autoDone=hasTarget&&cur>=m.target;
+    const done=hasTarget?autoDone:m.done;
+    if(hasTarget){
+      return `<div class="ms-row ${done?'done':''}"><span class="ms-date">${m.date?fmtDate(m.date):'无日期'}</span><span class="ms-title">${esc(m.title)}</span><div class="ms-prog-inline"><div class="pbar" style="width:50px;height:5px;border-radius:3px;background:var(--surface-3);overflow:hidden;flex:none"><i style="width:${pct}%;height:100%;background:${done?'var(--success)':'var(--accent)'};display:block"></i></div><input type="number" class="ms-cur-input" value="${cur}" step="0.5" style="width:42px;border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:12px;text-align:center" onchange="updateMilestoneCurrent('${m.id}',this.value)" onfocus="this.select()">/<span style="font-size:12px;color:var(--text-muted)">${m.target}${esc(m.unit||'')}</span></div><span class="ms-del" onclick="delMilestoneInline('${m.id}')">删除</span></div>`;
+    }
+    return `<div class="ms-row ${done?'done':''}"><div class="ms-chk" onclick="toggleMilestoneInline('${m.id}')">${IC.chek}</div><span class="ms-date">${m.date?fmtDate(m.date):'无日期'}</span><span class="ms-title">${esc(m.title)}</span><span class="ms-del" onclick="delMilestoneInline('${m.id}')">删除</span></div>`;
+  }).join('');
 }
 function renderMilestoneSection(){
   const p=rec('study',editId);if(!p)return;
   const el=document.getElementById('msList');if(!el)return;
-  const ms=p.milestones||[];
-  let html='';
-  if(ms.length){
-    ms.forEach(m=>{
-      html+=`<div class="ms-row ${m.done?'done':''}"><div class="ms-chk" onclick="toggleMilestoneInline('${m.id}')">${IC.chek}</div><span class="ms-date">${m.date?fmtDate(m.date):'无日期'}</span><span class="ms-title">${esc(m.title)}</span><span class="ms-del" onclick="delMilestoneInline('${m.id}')">删除</span></div>`;
-    });
-  } else {
-    html+='<div style="font-size:12px;color:var(--text-faint);padding:6px 0">暂无目标，添加一个吧</div>';
-  }
-  el.innerHTML=html;
-  const ti=document.getElementById('ms_title');if(ti)ti.value='';
+  el.innerHTML=milestoneRowsHTML(p.milestones||[]);
 }
 function addMilestoneInline(){
   const p=rec('study',editId);if(!p)return;
-  const dateEl=document.getElementById('ms_date'),titleEl=document.getElementById('ms_title');
+  const dateEl=document.getElementById('ms_date'),titleEl=document.getElementById('ms_title'),targetEl=document.getElementById('ms_target'),unitEl=document.getElementById('ms_unit');
   const date=dateEl?dateEl.value:fmtISO(new Date());
   const title=titleEl?titleEl.value.trim():'';
   if(!title){alert('请写目标描述');return}
+  let target=targetEl?Number(targetEl.value):null;
+  let unit=unitEl?unitEl.value.trim():'';
+  if(!target||target<=0){
+    const am=title.match(/(\d+(?:\.\d+)?)\s*(分|个|篇|次|小时|分钟|天|本|套|道)/);
+    if(am){target=Number(am[1]);unit=unit||am[2]}
+  }
   p.milestones=p.milestones||[];
-  p.milestones.push({id:uid(),date:date||fmtISO(new Date()),title,done:false});
+  const m={id:uid(),date:date||fmtISO(new Date()),title,done:false};
+  if(target&&target>0){m.target=target;m.current=0;m.unit=unit||''}
+  p.milestones.push(m);
+  upsert('study',p);Sync.push('study',p);
+  renderMilestoneSection();
+}
+function updateMilestoneCurrent(msId,val){
+  const p=rec('study',editId);if(!p)return;
+  const m=(p.milestones||[]).find(x=>x.id===msId);if(!m)return;
+  m.current=Number(val)||0;
+  if(m.target!=null&&m.target>0)m.done=m.current>=m.target;
   upsert('study',p);Sync.push('study',p);
   renderMilestoneSection();
 }
 function toggleMilestoneInline(msId){
   const p=rec('study',editId);if(!p)return;
   const m=(p.milestones||[]).find(x=>x.id===msId);if(!m)return;
+  if(m.target!=null&&m.target>0)return;
   m.done=!m.done;
   upsert('study',p);Sync.push('study',p);
   renderMilestoneSection();
@@ -1497,7 +1537,7 @@ function delMilestoneInline(msId){
 function segVal(id){const b=document.querySelector('#'+id+' .sel');return b?b.dataset.v:''}
 function saveTodo(){const r={id:editId||uid(),title:val('f_title'),due:val('f_due'),priority:segVal('f_pri'),note:val('f_note'),done:rec('todos',editId)?.done||false};upsert('todos',r);Sync.push('todo',r);closeModal();render()}
 function saveProj(){const r=Object.assign(rec('projects',editId)||{expenses:[],items:[],stages:[],attachments:[]},{id:editId||uid(),name:val('f_name'),budgetMode:segVal('f_bmode')||'expense',budget:Number(val('f_budget')||0),status:segVal('f_stat')==='done'?'done':(segVal('f_stat')||'进行中'),note:val('f_note')});upsert('projects',r);Sync.push('project',r);closeModal();render()}
-function saveStudy(){const tw=val('f_total');const r={id:editId||uid(),title:val('f_title'),startDate:val('f_sdate')||fmtISO(new Date()),totalWeeks:tw?Number(tw):null,currentWeek:Number(val('f_cur')||0),note:val('f_note')};upsert('study',r);Sync.push('study',r);closeModal();render()}
+function saveStudy(){const tw=val('f_total');const r=Object.assign(rec('study',editId)||{},{id:editId||uid(),title:val('f_title'),startDate:val('f_sdate')||fmtISO(new Date()),totalWeeks:tw?Number(tw):null,currentWeek:Number(val('f_cur')||0),note:val('f_note')});const tg=val('f_target');if(tg&&Number(tg)>0){r.target=Number(tg);r.unit=val('f_unit')||'';r.current=Number(val('f_current')||0)}else{delete r.target;delete r.unit;delete r.current}upsert('study',r);Sync.push('study',r);closeModal();render()}
 function saveMoney(){const r={id:editId||uid(),kind:segVal('f_kind')||'invest',title:val('f_title'),type:segVal('f_type'),amount:Number(val('f_amount')||0),returned:Number(val('f_returned')||0),status:segVal('f_stat'),priority:segVal('f_pri'),note:val('f_note'),date:val('f_date')||fmtISO(new Date())};upsert('money',r);Sync.push('money',r);closeModal();render()}
 function moneyCats(kind){return kind==='income'?['工资','兼职','奖金','投资收益','其他']:['基金','股票','储蓄','债券','理财','其他']}
 function moneyStats(kind){return kind==='income'?['已入账','未入账']:['待研究','进行中','已决策']}
