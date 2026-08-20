@@ -139,13 +139,12 @@ input,textarea,select{font-family:inherit;font-size:inherit;color:inherit;backgr
 .exprow:active .edel{opacity:1}
 /* project items: checkbox style */
 .itemrow{display:flex;align-items:center;gap:var(--s2);padding:6px 0}
-.itemrow .ichk{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border-strong);flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;touch-action:manipulation}
-.itemrow .ichk::before{content:'';position:absolute;inset:-12px}
-.itemrow.done .ichk{background:var(--accent);border-color:var(--accent)}
-.itemrow .ichk svg{width:11px;height:11px;color:var(--accent-on);opacity:0}
-.itemrow.done .ichk svg{opacity:1}
+.itemrow .ichk{width:24px;height:24px;border-radius:6px;border:1.5px solid var(--border-strong);flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;-webkit-appearance:none;appearance:none;background:transparent}
+.itemrow .ichk svg{pointer-events:none;width:11px;height:11px;color:var(--accent-on);opacity:0}
+.itemrow.done .ichk,.item-block.done .ichk{background:var(--accent);border-color:var(--accent)}
+.itemrow.done .ichk svg,.item-block.done .ichk svg{opacity:1}
 .itemrow .iname{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
-.itemrow.done .iname{color:var(--text-muted);text-decoration:line-through}
+.itemrow.done .iname,.item-block.done .iname{color:var(--text-muted);text-decoration:line-through}
 .itemrow .iamt{font-size:12px;font-weight:600;color:var(--text-muted);font-variant-numeric:tabular-nums;flex:none}
 .item-add-exp{width:22px;height:22px;border-radius:var(--rf);font-size:14px;display:flex;align-items:center;justify-content:center;flex:none;opacity:.6}
 .item-add-exp:active{opacity:1}
@@ -687,7 +686,7 @@ function projCard(p,mini){
         si.forEach(it=>{
           const itExp=(it.expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0)+(it.amount||0);
           s+=`<div class="item-block ${it.done?'done':''}">`;
-          s+=`<div class="itemrow"><div class="ichk" onclick="event.stopPropagation();toggleItem('${p.id}','${it.id}')">${IC.chek}</div><div class="iname" onclick="editItem('${p.id}','${it.id}')">${esc(it.title)}</div>${itExp?`<div class="iamt">${money(itExp)}</div>`:''}<button class="item-add-exp" onclick="event.stopPropagation();addItemExpenseInline('${p.id}','${it.id}')">+</button></div>`;
+          s+=`<div class="itemrow ${it.done?'done':''}"><div class="ichk" onclick="event.stopPropagation();toggleItem('${p.id}','${it.id}')">${IC.chek}</div><div class="iname" onclick="editItem('${p.id}','${it.id}')">${esc(it.title)}</div>${itExp?`<div class="iamt">${money(itExp)}</div>`:''}<button class="item-add-exp" onclick="event.stopPropagation();addItemExpenseInline('${p.id}','${it.id}')">+</button></div>`;
           if(it.expenses&&it.expenses.length){s+='<div class="item-exps">';it.expenses.forEach(e=>{s+=`<div class="exprow"><span class="eamt">${money(e.amount)}</span><span class="ecat">${esc(e.note||e.category||'')} · ${fmtDate(e.date||'')}</span><button class="edel" onclick="event.stopPropagation();delItemExpenseInline('${p.id}','${it.id}','${e.id}')">删除</button></div>`});s+='</div>'}
           s+='</div>';
         });
@@ -707,7 +706,7 @@ function projCard(p,mini){
       unItems.forEach(it=>{
         const itExp=(it.expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0)+(it.amount||0);
         s+=`<div class="item-block ${it.done?'done':''}">`;
-        s+=`<div class="itemrow"><div class="ichk" onclick="event.stopPropagation();toggleItem('${p.id}','${it.id}')">${IC.chek}</div><div class="iname" onclick="editItem('${p.id}','${it.id}')">${esc(it.title)}</div>${itExp?`<div class="iamt">${money(itExp)}</div>`:''}<button class="item-add-exp" onclick="event.stopPropagation();addItemExpenseInline('${p.id}','${it.id}')">+</button></div>`;
+        s+=`<div class="itemrow ${it.done?'done':''}"><div class="ichk" onclick="event.stopPropagation();toggleItem('${p.id}','${it.id}')">${IC.chek}</div><div class="iname" onclick="editItem('${p.id}','${it.id}')">${esc(it.title)}</div>${itExp?`<div class="iamt">${money(itExp)}</div>`:''}<button class="item-add-exp" onclick="event.stopPropagation();addItemExpenseInline('${p.id}','${it.id}')">+</button></div>`;
         if(it.expenses&&it.expenses.length){s+='<div class="item-exps">';it.expenses.forEach(e=>{s+=`<div class="exprow"><span class="eamt">${money(e.amount)}</span><span class="ecat">${esc(e.note||e.category||'')} · ${fmtDate(e.date||'')}</span><button class="edel" onclick="event.stopPropagation();delItemExpenseInline('${p.id}','${it.id}','${e.id}')">删除</button></div>`});s+='</div>'}
         s+='</div>';
       });
