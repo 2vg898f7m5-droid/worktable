@@ -1,4 +1,4 @@
-const CACHE = 'worktable-v17';
+const CACHE = 'worktable-v18';
 const SHELL = [
   './',
   './index.html',
