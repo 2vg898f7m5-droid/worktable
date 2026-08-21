@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>修复中...</title>
+<style>
+body{font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#1A0E08;color:#D49888}
+.box{text-align:center;padding:40px}
+h1{font-size:20px;margin-bottom:12px}
+p{font-size:14px;opacity:0.7;margin:4px 0}
+.dot{width:12px;height:12px;border-radius:50%;background:#D49888;display:inline-block;animation:p 1s infinite}@keyframes p{0%,100%{opacity:0.3}50%{opacity:1}}
+</style>
+</head>
+<body>
+<div class="box">
+<h1>正在清理缓存 <span class="dot"></span></h1>
+<p id="s1">1. 注销旧版 Service Worker...</p>
+<p id="s2">2. 清除所有缓存...</p>
+<p id="s3">3. 正在跳转...</p>
+</div>
+<script>
+(async function(){
+  // 1. Unregister ALL service workers
+  if('serviceWorker' in navigator){
+    try{
+      const regs=await navigator.serviceWorker.getRegistrations();
+      for(const reg of regs){
+        await reg.unregister();
+        console.log('Unregistered:', reg.scope);
+      }
+    }catch(e){console.log('SW unregister error:', e)}
+  }
+
+  // 2. Clear ALL caches
+  if('caches' in window){
+    try{
+      const keys=await caches.keys();
+      for(const k of keys){
+        await caches.delete(k);
+        console.log('Cache deleted:', k);
+      }
+    }catch(e){console.log('Cache clear error:', e)}
+  }
+
+  // 3. Clear localStorage bad state
+  try{
+    localStorage.removeItem('wb_unsynced');
+  }catch(e){}
+
+  // 4. Wait a moment then redirect with cache-busting
+  await new Promise(r=>setTimeout(r,1500));
+
+  // Redirect to main app with cache-busting query
+  const ts=Date.now();
+  window.location.href='./index.html?v='+ts;
+})();
+</script>
+</body>
+</html>
