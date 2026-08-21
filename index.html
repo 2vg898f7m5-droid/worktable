@@ -694,7 +694,7 @@ function calPick(ds){calSelDate=new Date(ds);render()}
 
 /* ====== todo ====== */
 function todoRow(t){const pr={高:'solid',中:'soft',低:'muted'}[t.priority]||'muted';return`<div class="todo ${t.done?'done':''}" onclick="toggleTodo('${t.id}')"><div class="chk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></div><div class="tmain"><div class="ttitle">${esc(t.title)}</div>${t.due||t.priority?`<div class="tmeta">${t.due?'<span>'+fmtDate(t.due)+'</span>':''}<span class="pill ${pr}">${t.priority||'低'}</span>${t.source?'<span>· '+esc(t.source)+'</span>':''}</div>`:''}</div><button class="tdel" onclick="event.stopPropagation();delRec('todos','${t.id}')">${IC.trash}</button></div>`}
-function execTodoRow(t){return`<div class="todo ${t.done?'done':''}" onclick="toggleExecTodo('${t.planId}','${t.dateStr}')"><div class="chk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></div><div class="tmain"><div class="ttitle">${esc(t.title)}</div><div class="tmeta"><span class="pill soft">每日</span>${t.source?'<span>· '+esc(t.source)+'</span>':''}</div></div></div>`}
+function execTodoRow(t){return`<div class="todo ${t.done?'done':''}" onclick="toggleExecTodo('${t.planId}','${t.dateStr}')"><div class="chk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></div><div class="tmain"><div class="ttitle">${esc(t.title)}</div><div class="tmeta"><span class="pill soft">每日</span>${t.source?'<span>· '+esc(t.source)+'</span>':''}</div></div><button class="tdel" onclick="event.stopPropagation();delExecPlan('${t.planId}')">${IC.trash}</button></div>`}
 function studyMini(p){const pct=progPct(p);const cc=load('study').filter(c=>c.parentId===p.id).length;const lb=cc?cc+' 个子计划':(p.isExec?'每日执行':(p.totalWeeks?'第 '+(p.currentWeek||0)+' / '+p.totalWeeks+' 周':'计划'));return`<div class="row" onclick="go('study')"><div class="rmain"><div class="rtitle">${esc(p.title)}</div><div class="rmeta"><span>${lb}</span></div></div><div class="pbar" style="width:70px"><i style="width:${pct}%"></i></div><span class="pct">${pct}%</span></div>`}
 
 /* ====== Project: checkbox items + item expenses ====== */
@@ -1363,6 +1363,20 @@ function toggleExecTodo(planId,dateStr){
   if(!a[i].completions)a[i].completions={};
   if(a[i].completions[dateStr])delete a[i].completions[dateStr];else a[i].completions[dateStr]=true;
   a[i].updatedAt=now();save('study',a);Sync.push('study',a[i]);render();
+}
+function delExecPlan(planId){
+  if(!confirm('删除此执行计划？关联的每日待办也会消失。'))return;
+  const a=load('study');
+  const toDel=new Set([planId]);
+  let changed=true;
+  while(changed){changed=false;a.forEach(p=>{if(p.parentId&&toDel.has(p.parentId)&&!toDel.has(p.id)){toDel.add(p.id);changed=true}})}
+  const tomb=JSON.parse(localStorage.getItem('wb_deleted')||'[]');
+  toDel.forEach(id=>{if(!tomb.includes(id))tomb.push(id)});
+  localStorage.setItem('wb_deleted',JSON.stringify(tomb));
+  const remaining=a.filter(p=>!toDel.has(p.id));
+  save('study',remaining);
+  localStorage.setItem('wb_unsynced','1');
+  render();
 }
 function smartParseStudy(){
   const note=val('f_note');
