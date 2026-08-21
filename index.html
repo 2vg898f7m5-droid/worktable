@@ -1440,7 +1440,7 @@ function smartParseStudy(){
 /* ====== add/edit sheets ====== */
 let editId=null,editType=null;
 function openAdd(type){editId=null;editType=type;if(type==='travel')return openTravelSheet(null);if(type==='journal'){journalEditId=null;return go('journalEdit')}if(type==='vocab')return openVocabSheet(null);openSheet(formSheet(type,null))}
-function editRec(t,id){editId=id;editType=t;if(t==='travel')return openTravelSheet(rec('travel',id));if(t==='journal'){journalEditId=id;return go('journalEdit')}if(t==='vocab')return openVocabSheet(rec('vocab',id));openSheet(formSheet(t,rec(t,id)))}
+function editRec(t,id){editId=id;editType=t;const sk=TYPES[t]||t;if(t==='travel')return openTravelSheet(rec(sk,id));if(t==='journal'){journalEditId=id;return go('journalEdit')}if(t==='vocab')return openVocabSheet(rec(sk,id));openSheet(formSheet(t,rec(sk,id)))}
 function formSheet(t,r){
   r=r||{};
   if(t==='todos')return sheetWrap('Todo',`<div class="field"><label>标题</label><input id="f_title" value="${esc(r.title||'')}" placeholder="要做什么?"></div><div class="field"><label>截止日期</label><input type="date" id="f_due" value="${r.due||''}"></div><div class="field"><label>优先级</label>${seg('f_pri',['高','中','低'],r.priority||'中')}</div><div class="field"><label>备注</label><textarea id="f_note" placeholder="可选">${esc(r.note||'')}</textarea></div>${saveBtn('saveTodo')}`+(r.id?`<button class="btn danger" style="margin-top:var(--s2)" onclick="delRec('todos','${r.id}');closeModal()">删除</button>`:''));
